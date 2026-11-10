@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120">
+<defs><marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#34495e"/></marker></defs>
+<style>text{font-family:Arial,sans-serif;fill:#183047}.title{font-size:30px;font-weight:bold}.sub{font-size:17px;fill:#536579}.head{font-size:21px;font-weight:bold}.txt{font-size:17px}.small{font-size:15px}.box{fill:#fff;stroke:#52718b;stroke-width:2;rx:14}.power{fill:#fff4d6;stroke:#ca8a04;stroke-width:2;rx:14}.signal{fill:#e8f4ff;stroke:#2780b9;stroke-width:2;rx:14}.warn{fill:#fff0ec;stroke:#bd4c32;stroke-width:2;rx:14}.wire{stroke:#34495e;stroke-width:3;fill:none;marker-end:url(#arr)}.bus{stroke:#16817a;stroke-width:4;fill:none}</style>
+<rect width="1600" height="1120" fill="#f6f9fc"/>
+<text x="60" y="58" class="title">Smart Box — schéma de branchement de principe</text>
+<text x="60" y="90" class="sub">Composants surlignés en jaune dans l’onglet « Électronique » + liaisons nécessaires au fonctionnement</text>
+<!-- Power chain -->
+<text x="60" y="145" class="head">1. Alimentation et charge</text>
+<rect x="60" y="170" width="190" height="115" class="box"/><text x="155" y="207" text-anchor="middle" class="head">USB-C J1</text><text x="155" y="238" text-anchor="middle" class="txt">VBUS 5 V / GND</text><text x="155" y="263" text-anchor="middle" class="small">CC1/CC2 → 5,1 kΩ → GND</text>
+<rect x="330" y="170" width="220" height="115" class="power"/><text x="440" y="207" text-anchor="middle" class="head">U4 — TP4056</text><text x="440" y="238" text-anchor="middle" class="txt">IN+ ← 5 V USB</text><text x="440" y="263" text-anchor="middle" class="txt">PROG — R13 10 kΩ</text>
+<rect x="640" y="170" width="210" height="115" class="power"/><text x="745" y="207" text-anchor="middle" class="head">BAT1 — LiPo</text><text x="745" y="238" text-anchor="middle" class="txt">BAT+ ← U4 BAT</text><text x="745" y="263" text-anchor="middle" class="txt">BAT− ↔ GND</text>
+<rect x="940" y="170" width="160" height="115" class="power"/><text x="1020" y="207" text-anchor="middle" class="head">SW5</text><text x="1020" y="238" text-anchor="middle" class="txt">en série sur</text><text x="1020" y="263" text-anchor="middle" class="txt">BAT+ vers charge</text>
+<rect x="1190" y="170" width="210" height="115" class="power"/><text x="1295" y="207" text-anchor="middle" class="head">U5 — LDO 3,3 V</text><text x="1295" y="238" text-anchor="middle" class="txt">IN ← SW5</text><text x="1295" y="263" text-anchor="middle" class="txt">OUT = rail 3V3</text>
+<path d="M250 225 H330" class="wire"/><path d="M550 225 H640" class="wire"/><path d="M850 225 H940" class="wire"/><path d="M1100 225 H1190" class="wire"/>
+<text x="60" y="320" class="small">C7–C10 (10 µF) : filtrage, placés près de VBUS / VBAT / entrée-sortie LDO / rail 3V3 selon le schéma PCB.</text>
+<!-- MCU center -->
+<text x="60" y="390" class="head">2. Microcontrôleur et signaux</text>
+<rect x="610" y="425" width="330" height="270" class="signal"/><text x="775" y="467" text-anchor="middle" class="head">U1 — ESP32-C3</text><text x="775" y="504" text-anchor="middle" class="txt">3V3 ← U5 OUT</text><text x="775" y="535" text-anchor="middle" class="txt">GND commun</text><text x="775" y="575" text-anchor="middle" class="txt">IO6 SDA · IO7 SCL</text><text x="775" y="605" text-anchor="middle" class="txt">IO3 RTC_INT · IO19 LED</text><text x="775" y="635" text-anchor="middle" class="txt">IO8 BUZZER_PWM → R14</text><text x="775" y="665" text-anchor="middle" class="txt">IO0/5/10/18 boutons</text>
+<path d="M1295 285 V350 H960 V465" class="wire"/><text x="1090" y="340" class="small">3V3 + GND</text>
+<!-- I2C -->
+<rect x="70" y="430" width="260" height="105" class="box"/><text x="200" y="469" text-anchor="middle" class="head">U2 — RTC DS3231</text><text x="200" y="503" text-anchor="middle" class="txt">SDA/SCL · INT/SQW</text>
+<rect x="70" y="570" width="260" height="105" class="box"/><text x="200" y="609" text-anchor="middle" class="head">DS1 — OLED SSD1306</text><text x="200" y="643" text-anchor="middle" class="txt">SDA/SCL · VCC · GND</text>
+<path d="M330 480 H420 V550 H610" class="bus"/><path d="M330 622 H450 V585 H610" class="bus"/><text x="410" y="462" class="small" fill="#16817a">Bus I²C partagé</text>
+<rect x="370" y="430" width="190" height="78" class="box"/><text x="465" y="460" text-anchor="middle" class="txt">R9 4,7 kΩ :</text><text x="465" y="488" text-anchor="middle" class="txt">SDA → 3V3</text>
+<rect x="370" y="590" width="190" height="78" class="box"/><text x="465" y="620" text-anchor="middle" class="txt">R10 4,7 kΩ :</text><text x="465" y="648" text-anchor="middle" class="txt">SCL → 3V3</text>
+<text x="70" y="710" class="small">U2 : INT/SQW → IO3 ; R7 10 kΩ entre INT/SQW et 3V3. BT1 (CR1220) selon la broche de secours exacte du module RTC.</text>
+<!-- Outputs -->
+<rect x="1050" y="430" width="230" height="105" class="box"/><text x="1165" y="469" text-anchor="middle" class="head">D1 — LED bleue</text><text x="1165" y="503" text-anchor="middle" class="txt">IO19 → R1 330 Ω → anode</text><text x="1165" y="526" text-anchor="middle" class="small">cathode → GND</text>
+<rect x="1330" y="430" width="220" height="105" class="box"/><text x="1440" y="469" text-anchor="middle" class="head">SW1–SW4</text><text x="1440" y="503" text-anchor="middle" class="txt">Bouton vers GND</text><text x="1440" y="526" text-anchor="middle" class="small">R2–R5 vers 3V3</text>
+<path d="M940 500 H1015 V480 H1050" class="wire"/><path d="M940 625 H1000 V580 H1430 V540" class="wire"/>
+<!-- transistors -->
+<text x="60" y="790" class="head">3. Buzzer piloté par transistor (et même montage pour moteur si présent)</text>
+<rect x="60" y="820" width="270" height="130" class="box"/><text x="195" y="858" text-anchor="middle" class="head">LS1 — Buzzer</text><text x="195" y="893" text-anchor="middle" class="txt">+ → 3V3</text><text x="195" y="922" text-anchor="middle" class="txt">− → collecteur Q1</text>
+<rect x="440" y="820" width="300" height="130" class="signal"/><text x="590" y="858" text-anchor="middle" class="head">Q1 — NPN S8050</text><text x="590" y="893" text-anchor="middle" class="txt">émetteur → GND</text><text x="590" y="922" text-anchor="middle" class="txt">IO8 → R14 1 kΩ → base</text>
+<rect x="830" y="820" width="280" height="130" class="box"/><text x="970" y="858" text-anchor="middle" class="head">R16 — 100 kΩ</text><text x="970" y="893" text-anchor="middle" class="txt">base Q1 → GND</text><text x="970" y="922" text-anchor="middle" class="small">D3 en parallèle sur LS1</text>
+<path d="M330 885 H440" class="wire"/><path d="M740 885 H830" class="wire"/>
+<rect x="1190" y="820" width="350" height="130" class="warn"/><text x="1365" y="855" text-anchor="middle" class="head">Diode D3 (bobine)</text><text x="1365" y="889" text-anchor="middle" class="txt">cathode (barre) → +3V3</text><text x="1365" y="920" text-anchor="middle" class="txt">anode → collecteur Q1</text>
+<text x="60" y="985" class="small">Q2 / R15 / R17 / D4 : montage identique pour le moteur M1, piloté par IO2. D3/D4 : vérifier que la diode choisie convient au courant réel.</text>
+<rect x="60" y="1010" width="1480" height="75" class="warn"/><text x="85" y="1042" class="txt" font-weight="bold">Attention avant soudure :</text><text x="275" y="1042" class="txt">schéma de principe, pas un PCB validé. Vérifier les broches exactes des modules, la polarité batterie/LED/diodes,</text><text x="85" y="1070" class="txt">le brochage du S8050 selon son fabricant et la charge simultanée du TP4056. Ne jamais brancher directement un GPIO sur buzzer/moteur.</text>
+</svg>
