@@ -77,6 +77,10 @@ export function AuthProvider({ children }) {
         await supabase.auth.signOut()
         throw new Error('Email non répertorié dans la whitelist des responsables. Le rôle est attribué par Supabase.')
       }
+      if (requestedRole === 'member' && profile.role !== 'member') {
+        await supabase.auth.signOut()
+        throw new Error('Email non répertorié dans la whitelist des membres actifs.')
+      }
       setUser(profile)
       return { user: profile }
     }
@@ -89,6 +93,7 @@ export function AuthProvider({ children }) {
       if (!allowed) throw new Error('Email non répertorié dans la liste des responsables pré-autorisés.')
       if (requestedRole === 'admin' && allowed.role !== 'admin') throw new Error('Cette adresse ne dispose pas des droits administration.')
       if (requestedRole === 'bureau' && !['bureau', 'member'].includes(allowed.role)) throw new Error('Cette adresse ne figure pas dans la liste des responsables de club.')
+      if (requestedRole === 'member' && allowed.role !== 'member') throw new Error('Cette adresse ne figure pas dans la liste des membres actifs.')
       profile = { ...allowed, name: name.trim() || allowed.name }
     } else {
       if (ALLOWED_ROLES.some(item => item.email === normalizedEmail)) throw new Error('Cette adresse est pré-autorisée comme responsable. Choisissez le rôle correspondant.')

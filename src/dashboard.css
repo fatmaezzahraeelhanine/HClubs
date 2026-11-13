@@ -1,0 +1,20 @@
+.search-control,.notification-control{position:relative}
+.search-results,.notification-panel{position:absolute;right:0;top:calc(100% + 9px);z-index:35;width:310px;background:#fff;border:1px solid #e7ebf1;border-radius:10px;box-shadow:0 14px 38px #0f172a1a;padding:7px}
+.search-results button,.notification-panel button{width:100%;border:0;background:transparent;border-radius:7px;display:flex;align-items:flex-start;gap:9px;padding:9px;text-align:left;color:#556174;font-size:11px}
+.search-results button:hover,.notification-panel button:hover{background:#f5f7fb}
+.search-results button>svg,.notification-panel button>svg{color:#6484d6;flex:none;margin-top:2px}
+.search-results button span{display:grid;gap:3px}.search-results button strong{font-size:11px;color:#273247}.search-results button small{font-size:10px;color:#929baa}
+.search-results p,.notification-panel p{margin:7px;padding:9px;color:#8892a1;font-size:11px}
+.notification-panel>strong{display:block;padding:7px 9px 9px;color:#263247;font:600 12px Manrope,sans-serif;border-bottom:1px solid #edf0f4;margin-bottom:4px}
+.title-actions{display:flex;gap:8px;align-items:center}
+.reservation-filter{height:31px;border:1px solid #e4e8ee;border-radius:6px;background:white;color:#667285;padding:0 9px;display:flex;align-items:center;gap:6px}
+.reservation-filter select{border:0;outline:0;background:transparent;color:#59667a;font:500 11px 'DM Sans',sans-serif;cursor:pointer}
+.task-status-control{display:grid;grid-template-columns:75px 1fr;align-items:center;gap:8px;margin-top:8px;color:#8892a0;font-size:10px}
+.task-status-control select{min-width:0;height:27px;border:1px solid #e8ebf0;border-radius:5px;padding:0 6px;background:#fff;color:#4e5a6e;font:500 10px 'DM Sans',sans-serif}
+.help-modal-icon{width:42px;height:42px;border-radius:11px;background:#edf3ff;color:#3568d6;display:grid;place-items:center;margin-bottom:17px}
+.help-modal h2{margin:8px 0 10px;font:700 21px Manrope,sans-serif;color:#1d293d}
+.help-modal>p:not(.section-eyebrow){font-size:13px;line-height:1.7;color:#707c8e}
+.help-links{display:grid;gap:8px;margin-top:20px}
+.help-links a,.help-links button{min-height:38px;padding:0 11px;border:1px solid #e5e9ef;border-radius:6px;background:#fff;color:#3a5fa8;text-decoration:none;text-align:left;font:600 11px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:space-between}
+.help-links a:hover,.help-links button:hover{background:#f7f9fd}
+@media(max-width:760px){.title-actions{gap:5px}.title-actions .btn-primary,.title-actions .btn-quiet{height:30px;padding:0 7px;font-size:0}.title-actions svg{margin:0}.search-results,.notification-panel{position:fixed;top:56px;right:10px;width:min(88vw,330px)}}

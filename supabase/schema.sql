@@ -11,7 +11,7 @@ create table clubs (
 
 create table allowed_roles (
   email text primary key check (email like '%@hestim.ma'),
-  role text not null check (role in ('bureau','admin')),
+  role text not null check (role in ('bureau','member','admin')),
   bureau_role text,
   club_id text references clubs(id)
 );
@@ -20,7 +20,7 @@ create table profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null,
   email text unique not null check (email like '%@hestim.ma'),
-  role text not null default 'student' check (role in ('student','bureau','admin')),
+  role text not null default 'student' check (role in ('student','bureau','member','admin')),
   bureau_role text,
   club_id text references clubs(id)
 );
@@ -124,7 +124,7 @@ alter table budgets enable row level security;
 
 -- profiles
 create policy "voir son profil ou admin" on profiles for select
-  using (id = auth.uid() or get_my_role() = 'admin');
+  using (id = auth.uid() or get_my_role() = 'admin' or (club_id is not null and club_id = get_my_club()));
 create policy "admin modifie profils" on profiles for all
   using (get_my_role() = 'admin');
 
@@ -151,27 +151,33 @@ create policy "admin approuve" on room_reservations for update
 
 -- projets et tâches (Kanban)
 create policy "projets du club" on projects for all
-  using (get_my_role() = 'admin' or (get_my_role() = 'bureau' and club_id = get_my_club()))
-  with check (get_my_role() = 'admin' or (get_my_role() = 'bureau' and club_id = get_my_club()));
+  using (get_my_role() = 'admin' or (get_my_role() in ('bureau','member') and club_id = get_my_club()))
+  with check (get_my_role() = 'admin' or (get_my_role() in ('bureau','member') and club_id = get_my_club()));
 create policy "taches du club" on tasks for all
-  using (get_my_role() = 'admin' or (get_my_role() = 'bureau' and club_id = get_my_club()))
-  with check (get_my_role() = 'admin' or (get_my_role() = 'bureau' and club_id = get_my_club()));
+  using (get_my_role() = 'admin' or (get_my_role() in ('bureau','member') and club_id = get_my_club()))
+  with check (get_my_role() = 'admin' or (get_my_role() in ('bureau','member') and club_id = get_my_club()));
 
 -- budgets
 create policy "voir budgets" on budgets for select
-  using (get_my_role() = 'admin' or (get_my_role() = 'bureau' and club_id = get_my_club()));
+  using (get_my_role() = 'admin' or (get_my_role() in ('bureau','member') and club_id = get_my_club()));
 create policy "admin budgets" on budgets for all using (get_my_role() = 'admin');
 
 -- ========== 5. DONNÉES DE DÉPART ==========
 insert into clubs values
-  ('club-robotics','Club Robotique'),
-  ('club-industrial','Club Génie Industriel');
+  ('robotique','Club Robotique'),
+  ('genie-civil','Club Génie Civil'),
+  ('entrepreneuriat','Club Entrepreneuriat'),
+  ('design','Club Design & Créativité'),
+  ('enactus','Enactus HESTIM'),
+  ('culture','Club Culture & Arts');
 
 -- Emails de test (à remplacer par les vrais emails plus tard)
 insert into allowed_roles values
-  ('test1@hestim.ma','admin',null,null),
-  ('test2@hestim.ma','bureau','president','club-robotics'),
-  ('test3@hestim.ma','bureau','vice-president','club-industrial');
+  ('admin@hestim.ma','admin',null,null),
+  ('president.robotique@hestim.ma','bureau','Président','robotique'),
+  ('vice.robotique@hestim.ma','bureau','Vice-président','robotique'),
+  ('secretaire.civil@hestim.ma','bureau','Secrétaire','genie-civil'),
+  ('membre.entrepreneuriat@hestim.ma','member','Membre actif','entrepreneuriat');
 
 insert into rooms (name, capacity) values
   ('Salle A101', 30),
