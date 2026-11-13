@@ -1,9 +1,15 @@
 -- HClubs feature migration for the existing schema in schema.sql.
 -- Run once in Supabase SQL Editor after the base schema.
 
+alter table public.allowed_roles drop constraint if exists allowed_roles_role_check;
+alter table public.allowed_roles add constraint allowed_roles_role_check check (role in ('bureau','member','admin'));
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles add constraint profiles_role_check check (role in ('student','bureau','member','admin'));
+
 -- Align the two sample club identifiers from the first SQL draft with the app.
 do $$ begin
-  if exists (select 1 from public.clubs where id = 'club-robotics') and not exists (select 1 from public.clubs where id = 'robotique') then
+  if exists (select 1 from public.clubs where id = 'club-robotics') then
+    insert into public.clubs(id, name) values ('robotique','Club Robotique') on conflict (id) do nothing;
     update public.allowed_roles set club_id = 'robotique' where club_id = 'club-robotics';
     update public.profiles set club_id = 'robotique' where club_id = 'club-robotics';
     update public.events set club_id = 'robotique' where club_id = 'club-robotics';
@@ -11,9 +17,10 @@ do $$ begin
     update public.projects set club_id = 'robotique' where club_id = 'club-robotics';
     update public.tasks set club_id = 'robotique' where club_id = 'club-robotics';
     update public.budgets set club_id = 'robotique' where club_id = 'club-robotics';
-    update public.clubs set id = 'robotique', name = 'Club Robotique' where id = 'club-robotics';
+    delete from public.clubs where id = 'club-robotics';
   end if;
-  if exists (select 1 from public.clubs where id = 'club-industrial') and not exists (select 1 from public.clubs where id = 'genie-civil') then
+  if exists (select 1 from public.clubs where id = 'club-industrial') then
+    insert into public.clubs(id, name) values ('genie-civil','Club Génie Civil') on conflict (id) do nothing;
     update public.allowed_roles set club_id = 'genie-civil' where club_id = 'club-industrial';
     update public.profiles set club_id = 'genie-civil' where club_id = 'club-industrial';
     update public.events set club_id = 'genie-civil' where club_id = 'club-industrial';
@@ -21,7 +28,7 @@ do $$ begin
     update public.projects set club_id = 'genie-civil' where club_id = 'club-industrial';
     update public.tasks set club_id = 'genie-civil' where club_id = 'club-industrial';
     update public.budgets set club_id = 'genie-civil' where club_id = 'club-industrial';
-    update public.clubs set id = 'genie-civil', name = 'Club Génie Civil' where id = 'club-industrial';
+    delete from public.clubs where id = 'club-industrial';
   end if;
 end $$;
 
@@ -62,11 +69,6 @@ alter table public.room_reservations
   add column if not exists attendees integer not null default 1;
 alter table public.room_reservations drop constraint if exists room_reservations_attendees_check;
 alter table public.room_reservations add constraint room_reservations_attendees_check check (attendees > 0);
-
-alter table public.allowed_roles drop constraint if exists allowed_roles_role_check;
-alter table public.allowed_roles add constraint allowed_roles_role_check check (role in ('bureau','member','admin'));
-alter table public.profiles drop constraint if exists profiles_role_check;
-alter table public.profiles add constraint profiles_role_check check (role in ('student','bureau','member','admin'));
 
 create table if not exists public.event_registrations (
   event_id uuid not null references public.events(id) on delete cascade,
