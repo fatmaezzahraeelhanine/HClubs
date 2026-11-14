@@ -13,7 +13,7 @@ Le build de production se génère avec `npm run build` et se lance en aperçu a
 
 ## Connexion Supabase
 
-Exécutez [`supabase/schema.sql`](supabase/schema.sql), puis [`supabase/migrations/20261113_hclubs_features.sql`](supabase/migrations/20261113_hclubs_features.sql) dans le SQL Editor de votre projet Supabase. Copiez ensuite `.env.example` vers `.env.local`, puis renseignez la clé publique `anon` (ou publishable) du projet `tpatppstlkslhqzmayir`. L’URL fournie est déjà inscrite dans `.env.example`. Ne mettez jamais une clé `service_role` dans une application React.
+Exécutez [`supabase/schema.sql`](supabase/schema.sql), puis [`supabase/migrations/20261113_hclubs_features.sql`](supabase/migrations/20261113_hclubs_features.sql) dans le SQL Editor de votre projet Supabase. L’URL et la clé publique publishable du projet sont configurées comme valeurs par défaut dans le client navigateur. `.env.local` peut les remplacer en développement. Une clé publishable est conçue pour l’application cliente; les politiques RLS protègent les données. Ne mettez jamais une clé `service_role` dans une application React.
 
 Quand les deux variables `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` sont définies, l’application utilise Supabase Auth et les tables SQL, en laissant les politiques RLS contrôler les accès. Sans elles, elle reste en mode démonstration `localStorage`.
 
