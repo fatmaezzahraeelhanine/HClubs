@@ -6,6 +6,14 @@ export const ALLOWED_ROLES = [
   { email: 'membre.entrepreneuriat@hestim.ma', role: 'member', bureauRole: 'Membre actif', clubId: 'entrepreneuriat', name: 'Omar Alaoui' },
 ]
 
+// Presentation-only identities accepted only when the URL contains ?demo=1.
+export const DEMO_ACCOUNTS = [
+  { email: 'demo.etudiant@hestim.ma', role: 'student', bureauRole: 'Étudiant', clubId: null, name: 'Étudiant Démo' },
+  { email: 'demo.membre@hestim.ma', role: 'member', bureauRole: 'Membre actif', clubId: 'robotique', name: 'Membre Démo' },
+  { email: 'demo.bureau@hestim.ma', role: 'bureau', bureauRole: 'Président', clubId: 'robotique', name: 'Président Démo' },
+  { email: 'demo.admin@hestim.ma', role: 'admin', bureauRole: 'Administration', clubId: null, name: 'Administration Démo' },
+]
+
 export const INITIAL_CLUBS = [
   { id: 'robotique', name: 'Club Robotique', category: 'Technologie', description: 'Imaginer, concevoir et donner vie à des robots. Rejoignez une communauté passionnée par l’innovation et la technologie.', members: 42, color: 'blue', icon: 'Cpu', room: 'Laboratoire A-12', budget: 18500, spent: 11200, lead: 'Yasmine El Mansouri', email: 'president.robotique@hestim.ma', featured: true },
   { id: 'genie-civil', name: 'Club Génie Civil', category: 'Ingénierie', description: 'Façonner la ville de demain à travers des projets concrets, des visites de chantier et des concours de construction.', members: 36, color: 'orange', icon: 'Construction', room: 'Atelier B-04', budget: 14200, spent: 7800, lead: 'Salma Idrissi', email: 'secretaire.civil@hestim.ma', featured: false },

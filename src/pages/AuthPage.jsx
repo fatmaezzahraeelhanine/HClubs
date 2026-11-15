@@ -41,8 +41,8 @@ export default function AuthPage() {
     finally { setResending(false) }
   }
   const demoLogin = (role, email, name) => {
-    setMode('register'); setError(''); setForm({ name, email, password: 'HESTIM2025!' })
-    setSuccess('Identifiants de démonstration préremplis. Créez le compte pour entrer.')
+    setMode('login'); setError(''); setForm({ name, email, password: 'HClubsDemo2026!' })
+    setSuccess(`Compte ${role} chargé. Cliquez sur « Accéder à mon espace ».`)
   }
 
   return <main className="auth-page">
@@ -78,7 +78,7 @@ export default function AuthPage() {
         </form>
         <div className="form-bottom"><span>{isRegister ? 'Déjà membre ?' : 'Vous n’avez pas encore de compte ?'}</span><button onClick={() => changeMode(isRegister ? 'login' : 'register')}>{isRegister ? 'Se connecter' : 'Créer un compte'} <ArrowUpRight size={12} /></button></div>
         {isRegister && <div className="access-note"><ShieldCheck size={16} /><span>Inscription simple avec une adresse @hestim.ma. Les accès bureau et administration sont activés uniquement si l’administration a autorisé votre adresse.</span></div>}
-        {usingSupabase ? <div className="access-note"><ShieldCheck size={16} /><span>Le rôle étudiant est attribué par défaut. Un rôle préautorisé est appliqué automatiquement après confirmation de l’adresse.</span></div> : <div className="demo-access"><div className="demo-heading"><span>Explorer la démo</span><span>ACCÈS DE TEST</span></div><div className="demo-actions"><button type="button" onClick={() => demoLogin('student', 'etudiant@hestim.ma', 'Étudiant Démo')}><Users size={14} /> Étudiant</button><button type="button" onClick={() => demoLogin('bureau', 'president.robotique@hestim.ma', 'Yasmine El Mansouri')}><Cpu size={14} /> Bureau</button><button type="button" onClick={() => demoLogin('admin', 'admin@hestim.ma', 'Administration HESTIM')}><ShieldCheck size={14} /> Admin</button></div><p><LockKeyhole size={11} /> Pour les accès de test, créez un compte depuis l’onglet ci-dessus.</p></div>}
+        {usingSupabase ? <div className="access-note"><ShieldCheck size={16} /><span>Le rôle étudiant est attribué par défaut. Un rôle préautorisé est appliqué automatiquement après confirmation de l’adresse.</span></div> : <div className="demo-access"><div className="demo-heading"><span>Explorer la démo</span><span>DONNÉES LOCALES</span></div><div className="demo-actions"><button type="button" onClick={() => demoLogin('Étudiant', 'demo.etudiant@hestim.ma', 'Étudiant Démo')}><Users size={14} /> Étudiant</button><button type="button" onClick={() => demoLogin('Membre actif', 'demo.membre@hestim.ma', 'Membre Démo')}><Users size={14} /> Membre actif</button><button type="button" onClick={() => demoLogin('Bureau', 'demo.bureau@hestim.ma', 'Président Démo')}><Cpu size={14} /> Bureau</button><button type="button" onClick={() => demoLogin('Administration', 'demo.admin@hestim.ma', 'Administration Démo')}><ShieldCheck size={14} /> Admin</button></div><p><LockKeyhole size={11} /> Mode local isolé : aucune modification n’est envoyée à Supabase. Mot de passe commun : HClubsDemo2026!</p></div>}
       </div>
       <div className="auth-legal"><span>En continuant, vous acceptez les conditions d’utilisation de HESTIM.</span><a href="mailto:clubs@hestim.ma">Confidentialité</a></div>
     </section>

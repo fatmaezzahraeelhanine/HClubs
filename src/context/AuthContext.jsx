@@ -1,10 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { ALLOWED_ROLES } from '../data/mockData'
+import { ALLOWED_ROLES, DEMO_ACCOUNTS } from '../data/mockData'
 import { supabase, supabaseConfigured } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 const SESSION_KEY = 'hestim_session_v1'
 const ACCOUNTS_KEY = 'hestim_accounts_v1'
+const DEMO_PASSWORD = 'HClubsDemo2026!'
 const AUTH_REDIRECT_URL = import.meta.env.VITE_AUTH_REDIRECT_URL?.trim() || 'https://h-clubs.vercel.app'
 const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback } catch { return fallback } }
 function friendlyAuthError(error, context = 'login') {
@@ -141,6 +142,12 @@ export function AuthProvider({ children }) {
       const profile = await fetchProfile(data.user.id)
       setUser(profile)
       return { user: profile }
+    }
+    const demoAccount = DEMO_ACCOUNTS.find(item => item.email === normalizedEmail)
+    if (demoAccount) {
+      if (password !== DEMO_PASSWORD) throw new Error('Mot de passe démo incorrect. Utilisez HClubsDemo2026!.')
+      setUser(demoAccount)
+      return { user: demoAccount }
     }
     const account = read(ACCOUNTS_KEY, []).find(item => item.email === normalizedEmail)
     if (!account) throw new Error('Adresse ou mot de passe incorrect. Créez un compte si vous êtes nouveau.')
