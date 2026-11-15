@@ -19,6 +19,8 @@ export default function AuthPage() {
   const [resending, setResending] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: '', requestedRole: 'student' })
   const isRegister = mode === 'register'
+  const currentError = error || authError
+  const canResendAfterError = usingSupabase && !/limite d’envoi|email rate limit|smtp personnalisé/i.test(currentError) && /confirmation|expiré/i.test(currentError)
   const changeMode = next => { setMode(next); setError(''); setSuccess(''); setConfirmationEmail('') }
   const change = event => setForm(current => ({ ...current, [event.target.name]: event.target.value }))
   const submit = async event => {
@@ -65,7 +67,7 @@ export default function AuthPage() {
         <div className="auth-top-note"><span className="secure-label"><LockKeyhole size={12} /> ESPACE SÉCURISÉ</span><a className="help-button" href="mailto:clubs@hestim.ma" title="Contacter l’aide" aria-label="Contacter l’aide"><CircleHelp size={18} /></a></div>
         <div className="auth-heading"><p className="auth-kicker">BIENVENUE SUR LE CAMPUS</p><h2>{isRegister ? 'Créer votre compte' : 'Ravi de vous revoir.'}</h2><p>{isRegister ? 'Rejoignez la communauté associative HESTIM.' : 'Connectez-vous pour retrouver votre espace.'}</p></div>
         <div className="auth-tabs"><button onClick={() => changeMode('login')} className={!isRegister ? 'active' : ''}>Se connecter</button><button onClick={() => changeMode('register')} className={isRegister ? 'active' : ''}>Créer un compte</button></div>
-        {(error || authError) && <div className="form-alert error-alert"><X size={16} /><span>{error || authError}{usingSupabase && /confirmation|expiré/i.test(error || authError) && <button type="button" disabled={resending} onClick={resendEmail} className="resend-confirmation">{resending ? 'Envoi…' : 'Renvoyer le mail de confirmation'}</button>}</span></div>}
+        {(error || authError) && <div className="form-alert error-alert"><X size={16} /><span>{currentError}{canResendAfterError && <button type="button" disabled={resending} onClick={resendEmail} className="resend-confirmation">{resending ? 'Envoi…' : 'Renvoyer le mail de confirmation'}</button>}</span></div>}
         {success && <div className="form-alert success-alert"><Check size={16} /><span>{success}{confirmationEmail && <> <button type="button" disabled={resending} onClick={resendEmail} className="resend-confirmation">{resending ? 'Envoi…' : 'Renvoyer le mail'}</button></>}</span></div>}
         <form className="auth-form" onSubmit={submit}>
           {isRegister && <label className="field-label">Nom complet<div className="input-wrap"><Users size={17} /><input name="name" value={form.name} onChange={change} placeholder="Ex. Yasmine El Mansouri" autoComplete="name" required /></div></label>}
