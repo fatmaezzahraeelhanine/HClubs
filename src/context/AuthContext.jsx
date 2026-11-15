@@ -7,7 +7,7 @@ const SESSION_KEY = 'hestim_session_v1'
 const ACCOUNTS_KEY = 'hestim_accounts_v1'
 const AUTH_REDIRECT_URL = import.meta.env.VITE_AUTH_REDIRECT_URL?.trim() || 'https://h-clubs.vercel.app'
 const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback } catch { return fallback } }
-function friendlyAuthError(error, context = 'login', requestedRole = '') {
+function friendlyAuthError(error, context = 'login') {
   const code = error?.code || error?.error_code || ''
   const message = `${code} ${error?.message || ''}`.toLowerCase()
   if (message.includes('over_email_send_rate_limit') || message.includes('email rate limit exceeded')) {
@@ -17,11 +17,8 @@ function friendlyAuthError(error, context = 'login', requestedRole = '') {
     return 'Le service e-mail Supabase de test n’envoie qu’aux adresses autorisées de l’équipe du projet. Configurez un SMTP personnalisé pour envoyer les confirmations aux étudiants.'
   }
   if (message.includes('database error saving new user')) {
-    if (context === 'register' && requestedRole !== 'student') {
-      const roleName = requestedRole === 'bureau' ? 'Bureau' : requestedRole === 'member' ? 'Membre actif' : 'Administration'
-      return `Supabase a refusé ce compte ${roleName} : ajoutez d’abord ${error?.email || 'cette adresse'} dans public.allowed_roles avec le rôle demandé et, pour un club, son identifiant de club. Le choix du formulaire ne donne pas ces droits.`
-    }
-    return 'Supabase n’a pas créé le profil étudiant. Vérifiez que les tables HClubs et le déclencheur on_auth_user_created sont installés dans la base.'
+    if (context === 'register') return 'Supabase n’a pas terminé la création du compte. Vérifiez que la migration « Inscription simple HClubs » est appliquée et que la table profiles existe.'
+    return 'Supabase n’a pas chargé le profil HClubs. Vérifiez la configuration de la base puis réessayez.'
   }
   if (message.includes('invalid login credentials')) return 'Adresse ou mot de passe incorrect. Si vous venez de créer votre compte, confirmez d’abord votre e-mail et vérifiez que l’inscription a bien été terminée.'
   if (context === 'register' && message.includes('already registered')) return 'Cette adresse possède déjà un compte. Connectez-vous ou demandez un nouveau mail de confirmation.'
@@ -88,7 +85,7 @@ export function AuthProvider({ children }) {
     if (user) sessionStorage.setItem(SESSION_KEY, JSON.stringify(user)); else sessionStorage.removeItem(SESSION_KEY)
   }, [user])
 
-  const register = async ({ name, email, password, requestedRole }) => {
+  const register = async ({ name, email, password }) => {
     const normalizedEmail = email.trim().toLowerCase()
     if (!normalizedEmail.endsWith('@hestim.ma')) throw new Error('Utilisez votre adresse institutionnelle en @hestim.ma.')
     if (!name.trim() || password.length < 8) throw new Error('Renseignez votre nom et un mot de passe de 8 caractères minimum.')
@@ -99,7 +96,7 @@ export function AuthProvider({ children }) {
         email: normalizedEmail,
         password,
         options: {
-          data: { name: name.trim(), requested_role: requestedRole },
+          data: { name: name.trim() },
           emailRedirectTo: AUTH_REDIRECT_URL,
         },
       })
@@ -114,40 +111,20 @@ export function AuthProvider({ children }) {
           details: error.details,
           hint: error.hint,
           email: normalizedEmail,
-        }, 'register', requestedRole))
+        }, 'register'))
       }
       if (!data.session || !data.user) return { message: 'Compte créé. Confirmez votre adresse e-mail, puis connectez-vous.', pendingConfirmation: true, email: normalizedEmail }
       const profile = await fetchProfile(data.user.id)
-      if (requestedRole === 'admin' && profile.role !== 'admin') {
-        await supabase.auth.signOut()
-        throw new Error('Email non autorisé pour l’administration. Le rôle est attribué par la whitelist Supabase.')
-      }
-      if (requestedRole === 'bureau' && profile.role !== 'bureau') {
-        await supabase.auth.signOut()
-        throw new Error('Email non répertorié dans la whitelist des responsables. Le rôle est attribué par Supabase.')
-      }
-      if (requestedRole === 'member' && profile.role !== 'member') {
-        await supabase.auth.signOut()
-        throw new Error('Email non répertorié dans la whitelist des membres actifs.')
-      }
       setUser(profile)
       return { user: profile }
     }
 
     const accounts = read(ACCOUNTS_KEY, [])
     if (accounts.some(account => account.email === normalizedEmail)) throw new Error('Un compte existe déjà pour cette adresse.')
-    let profile
-    if (requestedRole !== 'student') {
-      const allowed = ALLOWED_ROLES.find(item => item.email === normalizedEmail)
-      if (!allowed) throw new Error('Email non répertorié dans la liste des responsables pré-autorisés.')
-      if (requestedRole === 'admin' && allowed.role !== 'admin') throw new Error('Cette adresse ne dispose pas des droits administration.')
-      if (requestedRole === 'bureau' && !['bureau', 'member'].includes(allowed.role)) throw new Error('Cette adresse ne figure pas dans la liste des responsables de club.')
-      if (requestedRole === 'member' && allowed.role !== 'member') throw new Error('Cette adresse ne figure pas dans la liste des membres actifs.')
-      profile = { ...allowed, name: name.trim() || allowed.name }
-    } else {
-      if (ALLOWED_ROLES.some(item => item.email === normalizedEmail)) throw new Error('Cette adresse est pré-autorisée comme responsable. Choisissez le rôle correspondant.')
-      profile = { name: name.trim(), email: normalizedEmail, role: 'student', bureauRole: 'Étudiant', clubId: null }
-    }
+    const allowed = ALLOWED_ROLES.find(item => item.email === normalizedEmail)
+    const profile = allowed
+      ? { ...allowed, name: name.trim() || allowed.name }
+      : { name: name.trim(), email: normalizedEmail, role: 'student', bureauRole: 'Étudiant', clubId: null }
     const credentials = await hashPassword(password)
     localStorage.setItem(ACCOUNTS_KEY, JSON.stringify([...accounts, { ...profile, ...credentials }]))
     setUser(profile)

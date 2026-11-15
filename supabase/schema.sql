@@ -259,22 +259,13 @@ grant execute on function public.is_club_member(text) to authenticated;
 create or replace function public.assign_profile_from_whitelist() returns trigger
 language plpgsql security definer set search_path = public,pg_temp
 as $$
-declare w public.allowed_roles%rowtype; n text; requested_role text;
+declare w public.allowed_roles%rowtype; n text;
 begin
   if lower(coalesce(new.email,'')) not like '%@hestim.ma' then raise exception 'Adresse institutionnelle @hestim.ma obligatoire'; end if;
   select * into w from public.allowed_roles where email=lower(new.email);
-  requested_role := coalesce(new.raw_user_meta_data->>'requested_role','student');
-  if requested_role not in ('student','bureau','member','admin') then raise exception 'Rôle demandé invalide'; end if;
-  if requested_role='student' then
-    if found then raise exception 'Cette adresse est pré-autorisée avec le rôle %, sélectionnez ce rôle.',w.role; end if;
-  elsif not found then
-    raise exception 'Adresse absente de la whitelist HESTIM pour le rôle demandé';
-  elsif w.role<>requested_role then
-    raise exception 'Le rôle demandé ne correspond pas à la whitelist HESTIM';
-  end if;
   n := coalesce(nullif(trim(new.raw_user_meta_data->>'name'),''),split_part(new.email,'@',1));
   insert into public.profiles(id,name,email,role,bureau_role,club_id)
-  values(new.id,n,lower(new.email),coalesce(w.role,'student'),w.bureau_role,w.club_id)
+  values(new.id,n,lower(new.email),coalesce(w.role,'student'),coalesce(w.bureau_role,'Étudiant'),w.club_id)
   on conflict(id) do update set email=excluded.email;
   if w.role='admin' then
     return new;
@@ -628,13 +619,6 @@ end $$;
 drop trigger if exists allowed_roles_sync_profile on public.allowed_roles;
 create trigger allowed_roles_sync_profile after insert or update or delete on public.allowed_roles
 for each row execute function public.sync_profile_from_allowed_role();
-
--- Premier compte d'administration HClubs. Cette adresse est pré-autorisée;
--- la personne doit toujours créer/confirmer son propre compte Supabase Auth.
-insert into public.allowed_roles(email,role,bureau_role,club_id)
-values ('f.elanine@hestim.ma','admin','Administration',null)
-on conflict(email) do update
-set role=excluded.role,bureau_role=excluded.bureau_role,club_id=null;
 
 do $$ declare t text; begin
   if exists(select 1 from pg_publication where pubname='supabase_realtime') then
