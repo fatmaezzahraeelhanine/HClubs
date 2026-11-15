@@ -7,7 +7,7 @@ const SESSION_KEY = 'hestim_session_v1'
 const ACCOUNTS_KEY = 'hestim_accounts_v1'
 const AUTH_REDIRECT_URL = import.meta.env.VITE_AUTH_REDIRECT_URL?.trim() || 'https://h-clubs.vercel.app'
 const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback } catch { return fallback } }
-function friendlyAuthError(error, context = 'login') {
+function friendlyAuthError(error, context = 'login', requestedRole = '') {
   const code = error?.code || error?.error_code || ''
   const message = `${code} ${error?.message || ''}`.toLowerCase()
   if (message.includes('over_email_send_rate_limit') || message.includes('email rate limit exceeded')) {
@@ -17,7 +17,11 @@ function friendlyAuthError(error, context = 'login') {
     return 'Le service e-mail Supabase de test n’envoie qu’aux adresses autorisées de l’équipe du projet. Configurez un SMTP personnalisé pour envoyer les confirmations aux étudiants.'
   }
   if (message.includes('database error saving new user')) {
-    return 'La création du profil a échoué. Vérifiez que la migration d’inscription HESTIM est installée dans Supabase et que le rôle demandé correspond à la whitelist.'
+    if (context === 'register' && requestedRole !== 'student') {
+      const roleName = requestedRole === 'bureau' ? 'Bureau' : requestedRole === 'member' ? 'Membre actif' : 'Administration'
+      return `Supabase a refusé ce compte ${roleName} : ajoutez d’abord ${error?.email || 'cette adresse'} dans public.allowed_roles avec le rôle demandé et, pour un club, son identifiant de club. Le choix du formulaire ne donne pas ces droits.`
+    }
+    return 'Supabase n’a pas créé le profil étudiant. Vérifiez que les tables HClubs et le déclencheur on_auth_user_created sont installés dans la base.'
   }
   if (message.includes('invalid login credentials')) return 'Adresse ou mot de passe incorrect. Si vous venez de créer votre compte, confirmez d’abord votre e-mail et vérifiez que l’inscription a bien été terminée.'
   if (context === 'register' && message.includes('already registered')) return 'Cette adresse possède déjà un compte. Connectez-vous ou demandez un nouveau mail de confirmation.'
@@ -99,7 +103,7 @@ export function AuthProvider({ children }) {
         },
       })
       if (error) {
-        throw new Error(friendlyAuthError(error, 'register'))
+        throw new Error(friendlyAuthError({ ...error, email: normalizedEmail }, 'register', requestedRole))
       }
       if (!data.session || !data.user) return { message: 'Compte créé. Confirmez votre adresse e-mail, puis connectez-vous.', pendingConfirmation: true, email: normalizedEmail }
       const profile = await fetchProfile(data.user.id)
