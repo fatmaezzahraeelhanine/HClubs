@@ -33,3 +33,17 @@ begin
   end if;
   return new;
 end $$;
+
+-- Also promotes existing Auth profiles whose e-mail was whitelisted after signup.
+update public.profiles p
+set role=w.role,bureau_role=w.bureau_role,club_id=w.club_id
+from public.allowed_roles w
+where w.email=p.email
+  and (p.role is distinct from w.role or p.bureau_role is distinct from w.bureau_role or p.club_id is distinct from w.club_id);
+
+insert into public.club_memberships(club_id,user_id,membership_role,status)
+select p.club_id,p.id,p.role,'active'
+from public.profiles p
+where p.role in ('bureau','member') and p.club_id is not null
+on conflict(club_id,user_id) do update
+set membership_role=excluded.membership_role,status='active';
