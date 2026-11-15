@@ -26,6 +26,7 @@ function toProfile(row) {
 }
 async function fetchProfile(userId) {
   const { data, error } = await supabase.from('profiles').select('id,name,email,role,bureau_role,club_id').eq('id', userId).single()
+  if (error?.code === 'PGRST116') throw new Error('Profil HESTIM introuvable. Exécutez la migration Supabase des profils existants, puis reconnectez-vous.')
   if (error) throw error
   return toProfile(data)
 }

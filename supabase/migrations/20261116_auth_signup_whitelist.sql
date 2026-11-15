@@ -34,12 +34,20 @@ begin
   return new;
 end $$;
 
--- Also promotes existing Auth profiles whose e-mail was whitelisted after signup.
-update public.profiles p
-set role=w.role,bureau_role=w.bureau_role,club_id=w.club_id
-from public.allowed_roles w
-where w.email=p.email
-  and (p.role is distinct from w.role or p.bureau_role is distinct from w.bureau_role or p.club_id is distinct from w.club_id);
+-- Create missing HESTIM profiles and synchronize existing profiles from the whitelist.
+insert into public.profiles(id,name,email,role,bureau_role,club_id)
+select u.id,
+       coalesce(nullif(trim(u.raw_user_meta_data->>'name'),''),split_part(lower(u.email),'@',1)),
+       lower(u.email),
+       coalesce(w.role,'student'),
+       coalesce(w.bureau_role,case when w.email is null then 'Étudiant' end),
+       w.club_id
+from auth.users u
+left join public.allowed_roles w on w.email=lower(u.email)
+where lower(coalesce(u.email,'')) like '%@hestim.ma'
+on conflict(id) do update
+set name=excluded.name,email=excluded.email,role=excluded.role,
+    bureau_role=excluded.bureau_role,club_id=excluded.club_id;
 
 insert into public.club_memberships(club_id,user_id,membership_role,status)
 select p.club_id,p.id,p.role,'active'
