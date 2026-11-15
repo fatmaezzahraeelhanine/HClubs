@@ -34,6 +34,12 @@ begin
   return new;
 end $$;
 
+-- Ensure the profile is created automatically for every new HESTIM Auth user.
+-- Unlisted addresses become students; elevated roles still require allowed_roles.
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users
+for each row execute function public.assign_profile_from_whitelist();
+
 -- Create missing HESTIM profiles and synchronize existing profiles from the whitelist.
 insert into public.profiles(id,name,email,role,bureau_role,club_id)
 select u.id,

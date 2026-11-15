@@ -7,6 +7,22 @@ const SESSION_KEY = 'hestim_session_v1'
 const ACCOUNTS_KEY = 'hestim_accounts_v1'
 const AUTH_REDIRECT_URL = import.meta.env.VITE_AUTH_REDIRECT_URL?.trim() || 'https://h-clubs.vercel.app'
 const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback } catch { return fallback } }
+function friendlyAuthError(error, context = 'login') {
+  const code = error?.code || error?.error_code || ''
+  const message = `${code} ${error?.message || ''}`.toLowerCase()
+  if (message.includes('over_email_send_rate_limit') || message.includes('email rate limit exceeded')) {
+    return 'Supabase a atteint sa limite d’envoi d’e-mails (2 par heure avec le service intégré). L’inscription est bloquée tant qu’un SMTP personnalisé n’est pas configuré dans Supabase. Réessayez après réinitialisation de la limite.'
+  }
+  if (message.includes('email_address_not_authorized')) {
+    return 'Le service e-mail Supabase de test n’envoie qu’aux adresses autorisées de l’équipe du projet. Configurez un SMTP personnalisé pour envoyer les confirmations aux étudiants.'
+  }
+  if (message.includes('database error saving new user')) {
+    return 'La création du profil a échoué. Vérifiez que la migration d’inscription HESTIM est installée dans Supabase et que le rôle demandé correspond à la whitelist.'
+  }
+  if (message.includes('invalid login credentials')) return 'Adresse ou mot de passe incorrect. Si vous venez de créer votre compte, confirmez d’abord votre e-mail et vérifiez que l’inscription a bien été terminée.'
+  if (context === 'register' && message.includes('already registered')) return 'Cette adresse possède déjà un compte. Connectez-vous ou demandez un nouveau mail de confirmation.'
+  return error?.message || 'Une erreur est survenue.'
+}
 function restoreSession() {
   try {
     const saved = JSON.parse(sessionStorage.getItem(SESSION_KEY))
@@ -83,8 +99,7 @@ export function AuthProvider({ children }) {
         },
       })
       if (error) {
-        if (error.message?.includes('Database error saving new user')) throw new Error('Cette adresse HESTIM ne correspond pas au rôle demandé. Vérifiez son adresse et son club dans la whitelist Supabase.')
-        throw error
+        throw new Error(friendlyAuthError(error, 'register'))
       }
       if (!data.session || !data.user) return { message: 'Compte créé. Confirmez votre adresse e-mail, puis connectez-vous.', pendingConfirmation: true, email: normalizedEmail }
       const profile = await fetchProfile(data.user.id)
@@ -130,7 +145,7 @@ export function AuthProvider({ children }) {
     setAuthError('')
     if (supabaseConfigured) {
       const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password })
-      if (error) throw error
+      if (error) throw new Error(friendlyAuthError(error, 'login'))
       const profile = await fetchProfile(data.user.id)
       setUser(profile)
       return { user: profile }
@@ -156,7 +171,7 @@ export function AuthProvider({ children }) {
       email: normalizedEmail,
       options: { emailRedirectTo: AUTH_REDIRECT_URL },
     })
-    if (error) throw error
+    if (error) throw new Error(friendlyAuthError(error, 'register'))
   }
 
   const logout = async () => {
