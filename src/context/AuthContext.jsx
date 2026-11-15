@@ -5,6 +5,7 @@ import { supabase, supabaseConfigured } from '../lib/supabase'
 const AuthContext = createContext(null)
 const SESSION_KEY = 'hestim_session_v1'
 const ACCOUNTS_KEY = 'hestim_accounts_v1'
+const AUTH_REDIRECT_URL = import.meta.env.VITE_AUTH_REDIRECT_URL?.trim() || 'https://h-clubs.vercel.app'
 const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback } catch { return fallback } }
 function restoreSession() {
   try {
@@ -34,6 +35,13 @@ export function AuthProvider({ children }) {
   const [authError, setAuthError] = useState('')
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const params = new URLSearchParams(window.location.hash.slice(1))
+      const code = params.get('error_code')
+      if (code === 'otp_expired') setAuthError('Ce lien de confirmation a expiré ou a déjà été utilisé. Renvoyez un nouveau lien avec votre adresse HESTIM.')
+      else if (params.get('error')) setAuthError(params.get('error_description') || 'La confirmation du compte a échoué. Demandez un nouveau lien.')
+      if (params.has('error')) window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`)
+    }
     if (supabaseConfigured) {
       let active = true
       supabase.auth.getSession().then(async ({ data, error }) => {
@@ -65,9 +73,19 @@ export function AuthProvider({ children }) {
     setAuthError('')
 
     if (supabaseConfigured) {
-      const { data, error } = await supabase.auth.signUp({ email: normalizedEmail, password, options: { data: { name: name.trim() } } })
-      if (error) throw error
-      if (!data.session || !data.user) return { message: 'Compte créé. Confirmez votre adresse e-mail, puis connectez-vous.' }
+      const { data, error } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+        options: {
+          data: { name: name.trim(), requested_role: requestedRole },
+          emailRedirectTo: AUTH_REDIRECT_URL,
+        },
+      })
+      if (error) {
+        if (error.message?.includes('Database error saving new user')) throw new Error('Cette adresse HESTIM ne correspond pas au rôle demandé. Vérifiez son adresse et son club dans la whitelist Supabase.')
+        throw error
+      }
+      if (!data.session || !data.user) return { message: 'Compte créé. Confirmez votre adresse e-mail, puis connectez-vous.', pendingConfirmation: true, email: normalizedEmail }
       const profile = await fetchProfile(data.user.id)
       if (requestedRole === 'admin' && profile.role !== 'admin') {
         await supabase.auth.signOut()
@@ -128,6 +146,18 @@ export function AuthProvider({ children }) {
     return { user: profile }
   }
 
+  const resendConfirmation = async email => {
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!normalizedEmail.endsWith('@hestim.ma')) throw new Error('Utilisez votre adresse institutionnelle en @hestim.ma.')
+    if (!supabaseConfigured) throw new Error('Le renvoi du mail est disponible uniquement avec Supabase.')
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: normalizedEmail,
+      options: { emailRedirectTo: AUTH_REDIRECT_URL },
+    })
+    if (error) throw error
+  }
+
   const logout = async () => {
     if (supabaseConfigured) {
       const { error } = await supabase.auth.signOut()
@@ -135,7 +165,7 @@ export function AuthProvider({ children }) {
     }
     setUser(null)
   }
-  const value = useMemo(() => ({ user, register, login, logout, authError, clearAuthError: () => setAuthError(''), usingSupabase: supabaseConfigured }), [user, authError])
+  const value = useMemo(() => ({ user, register, login, logout, resendConfirmation, authError, clearAuthError: () => setAuthError(''), usingSupabase: supabaseConfigured }), [user, authError])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

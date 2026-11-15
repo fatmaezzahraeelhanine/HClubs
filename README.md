@@ -41,7 +41,9 @@ Inscrivez ensuite ces comptes via l’écran HClubs. Le trigger créera leurs pr
 
 ### Connexion de l’application
 
-Le client utilise `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`; créez `.env.local` pour le développement et définissez les mêmes variables dans Vercel pour la production. Sans configuration Supabase, l’application reste en mode démonstration `localStorage`.
+Le client utilise `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` et `VITE_AUTH_REDIRECT_URL`; créez `.env.local` pour le développement et définissez ces variables dans Vercel pour la production. La redirection de confirmation par défaut vise `https://h-clubs.vercel.app`, jamais une URL Vercel de prévisualisation. Dans Supabase > Authentication > URL Configuration, définissez cette URL comme **Site URL** et ajoutez `https://h-clubs.vercel.app/**` aux **Redirect URLs**. Ajoutez aussi les URLs locales de développement (`http://localhost:5173/**` et `http://127.0.0.1:5173/**`) si nécessaire. Sans configuration Supabase, l’application reste en mode démonstration `localStorage`.
+
+Pour mettre à jour un projet existant avec la vérification du rôle demandé à l’inscription, exécutez une fois [`supabase/migrations/20261116_auth_signup_whitelist.sql`](supabase/migrations/20261116_auth_signup_whitelist.sql) après le schéma principal.
 
 Après l’installation, créez un utilisateur étudiant avec une adresse `@hestim.ma`. Pour créer l’administrateur ou un responsable, ajoutez son adresse dans `allowed_roles` avant l’inscription Auth; le trigger crée alors son profil et son adhésion avec le rôle autorisé.
 

@@ -9,25 +9,34 @@ const features = [
 ]
 
 export default function AuthPage() {
-  const { login, register, authError, usingSupabase } = useAuth()
+  const { login, register, resendConfirmation, authError, clearAuthError, usingSupabase } = useAuth()
   const [mode, setMode] = useState('login')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const [confirmationEmail, setConfirmationEmail] = useState('')
+  const [resending, setResending] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: '', requestedRole: 'student' })
   const isRegister = mode === 'register'
-  const changeMode = next => { setMode(next); setError(''); setSuccess('') }
+  const changeMode = next => { setMode(next); setError(''); setSuccess(''); setConfirmationEmail('') }
   const change = event => setForm(current => ({ ...current, [event.target.name]: event.target.value }))
   const submit = async event => {
-    event.preventDefault(); setError(''); setSuccess(''); setLoading(true)
+    event.preventDefault(); setError(''); setSuccess(''); setConfirmationEmail(''); setLoading(true)
     try {
       if (isRegister) {
         const result = await register(form)
-        if (result?.message) setSuccess(result.message)
+        if (result?.message) { setSuccess(result.message); setConfirmationEmail(result.pendingConfirmation ? result.email : '') }
       } else await login(form)
     } catch (cause) { setError(cause.message || 'Une erreur est survenue.') }
     finally { setLoading(false) }
+  }
+  const resendEmail = async () => {
+    const email = confirmationEmail || form.email
+    setError(''); clearAuthError(); setResending(true)
+    try { await resendConfirmation(email); setConfirmationEmail(email.trim().toLowerCase()); setSuccess('Un nouveau lien de confirmation a été envoyé. Ouvrez le dernier e-mail reçu.') }
+    catch (cause) { setError(cause.message || 'Impossible de renvoyer l’e-mail.') }
+    finally { setResending(false) }
   }
   const demoLogin = (role, email, name) => {
     setMode('register'); setError(''); setForm({ name, email, password: 'HESTIM2025!', requestedRole: role })
@@ -56,8 +65,8 @@ export default function AuthPage() {
         <div className="auth-top-note"><span className="secure-label"><LockKeyhole size={12} /> ESPACE SÉCURISÉ</span><a className="help-button" href="mailto:clubs@hestim.ma" title="Contacter l’aide" aria-label="Contacter l’aide"><CircleHelp size={18} /></a></div>
         <div className="auth-heading"><p className="auth-kicker">BIENVENUE SUR LE CAMPUS</p><h2>{isRegister ? 'Créer votre compte' : 'Ravi de vous revoir.'}</h2><p>{isRegister ? 'Rejoignez la communauté associative HESTIM.' : 'Connectez-vous pour retrouver votre espace.'}</p></div>
         <div className="auth-tabs"><button onClick={() => changeMode('login')} className={!isRegister ? 'active' : ''}>Se connecter</button><button onClick={() => changeMode('register')} className={isRegister ? 'active' : ''}>Créer un compte</button></div>
-        {(error || authError) && <div className="form-alert error-alert"><X size={16} /><span>{error || authError}</span></div>}
-        {success && <div className="form-alert success-alert"><Check size={16} /><span>{success}</span></div>}
+        {(error || authError) && <div className="form-alert error-alert"><X size={16} /><span>{error || authError}{usingSupabase && /confirmation|expiré/i.test(error || authError) && <button type="button" disabled={resending} onClick={resendEmail} className="resend-confirmation">{resending ? 'Envoi…' : 'Renvoyer le mail de confirmation'}</button>}</span></div>}
+        {success && <div className="form-alert success-alert"><Check size={16} /><span>{success}{confirmationEmail && <> <button type="button" disabled={resending} onClick={resendEmail} className="resend-confirmation">{resending ? 'Envoi…' : 'Renvoyer le mail'}</button></>}</span></div>}
         <form className="auth-form" onSubmit={submit}>
           {isRegister && <label className="field-label">Nom complet<div className="input-wrap"><Users size={17} /><input name="name" value={form.name} onChange={change} placeholder="Ex. Yasmine El Mansouri" autoComplete="name" required /></div></label>}
           <label className="field-label">Adresse e-mail HESTIM<div className="input-wrap"><Mail size={17} /><input name="email" type="email" value={form.email} onChange={change} placeholder="nom@hestim.ma" autoComplete="email" required /></div></label>
@@ -67,7 +76,7 @@ export default function AuthPage() {
           <button className="submit-button" disabled={loading} type="submit">{loading ? 'Un instant…' : isRegister ? 'Créer mon compte' : 'Accéder à mon espace'}<ArrowRight size={17} /></button>
         </form>
         <div className="form-bottom"><span>{isRegister ? 'Déjà membre ?' : 'Vous n’avez pas encore de compte ?'}</span><button onClick={() => changeMode(isRegister ? 'login' : 'register')}>{isRegister ? 'Se connecter' : 'Créer un compte'} <ArrowUpRight size={12} /></button></div>
-        {isRegister && <div className="access-note"><ShieldCheck size={16} /><span>Les responsables de club et l’administration doivent figurer sur la liste d’accès HESTIM.</span></div>}
+        {isRegister && <div className="access-note"><ShieldCheck size={16} /><span>Le rôle choisi est vérifié par la whitelist : les adresses bureau, membre actif et administration doivent déjà y être inscrites avec le bon club.</span></div>}
         {usingSupabase ? <div className="access-note"><ShieldCheck size={16} /><span>Connexion à Supabase activée. Le rôle et l’accès au club sont définis par la whitelist SQL lors de l’inscription.</span></div> : <div className="demo-access"><div className="demo-heading"><span>Explorer la démo</span><span>ACCÈS DE TEST</span></div><div className="demo-actions"><button type="button" onClick={() => demoLogin('student', 'etudiant@hestim.ma', 'Étudiant Démo')}><Users size={14} /> Étudiant</button><button type="button" onClick={() => demoLogin('bureau', 'president.robotique@hestim.ma', 'Yasmine El Mansouri')}><Cpu size={14} /> Bureau</button><button type="button" onClick={() => demoLogin('admin', 'admin@hestim.ma', 'Administration HESTIM')}><ShieldCheck size={14} /> Admin</button></div><p><LockKeyhole size={11} /> Pour les accès de test, créez un compte depuis l’onglet ci-dessus.</p></div>}
       </div>
       <div className="auth-legal"><span>En continuant, vous acceptez les conditions d’utilisation de HESTIM.</span><a href="mailto:clubs@hestim.ma">Confidentialité</a></div>
