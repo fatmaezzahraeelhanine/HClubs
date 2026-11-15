@@ -27,7 +27,11 @@ Les tables couvrent les profils et rôles autorisés, clubs et demandes de créa
 - Les inscriptions aux événements passent par une fonction SQL transactionnelle. Les places ne peuvent pas dépasser `max_places` même en cas d’inscriptions simultanées.
 - Les données sensibles ne doivent jamais être exposées avec une clé Supabase `service_role`. La clé publishable est la seule clé adaptée au navigateur.
 
-Le script ne crée volontairement aucun compte staff fictif. Avant d’inscrire les responsables, ajoutez leurs vraies adresses dans la whitelist, par exemple :
+Le schéma préautorise `f.elanine@hestim.ma` comme premier compte d’administration dans `allowed_roles`. Cette entrée ne crée pas de compte Auth et ne contourne pas la confirmation d’adresse : cette personne doit créer son compte HClubs avec cette adresse. Après connexion, l’admin gère les rôles dans **Administration → Autorisations des responsables**, sans écrire de SQL.
+
+Pour autoriser les responsables d’un bureau, l’admin ajoute leurs vraies adresses HESTIM dans le même panneau, choisit la fonction (président, vice-président, secrétaire ou trésorier) et le club. Les étudiants conservent l’inscription libre avec leur adresse `@hestim.ma`.
+
+Pour ajouter une autre adresse de responsable manuellement, le SQL correspondant est :
 
 ```sql
 insert into public.allowed_roles(email, role, bureau_role, club_id) values

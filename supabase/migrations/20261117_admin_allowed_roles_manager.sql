@@ -96,3 +96,10 @@ from public.profiles p
 where p.role in ('bureau','member') and p.club_id is not null
 on conflict(club_id,user_id) do update
 set membership_role = excluded.membership_role, status = 'active';
+
+-- Bootstrap the first administrator; authentication and email confirmation
+-- remain handled by Supabase Auth when this person creates/signs into an account.
+insert into public.allowed_roles(email, role, bureau_role, club_id)
+values ('f.elanine@hestim.ma', 'admin', 'Administration', null)
+on conflict (email) do update
+set role = excluded.role, bureau_role = excluded.bureau_role, club_id = null;

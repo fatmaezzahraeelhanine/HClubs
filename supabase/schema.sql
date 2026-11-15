@@ -629,6 +629,13 @@ drop trigger if exists allowed_roles_sync_profile on public.allowed_roles;
 create trigger allowed_roles_sync_profile after insert or update or delete on public.allowed_roles
 for each row execute function public.sync_profile_from_allowed_role();
 
+-- Premier compte d'administration HClubs. Cette adresse est pré-autorisée;
+-- la personne doit toujours créer/confirmer son propre compte Supabase Auth.
+insert into public.allowed_roles(email,role,bureau_role,club_id)
+values ('f.elanine@hestim.ma','admin','Administration',null)
+on conflict(email) do update
+set role=excluded.role,bureau_role=excluded.bureau_role,club_id=null;
+
 do $$ declare t text; begin
   if exists(select 1 from pg_publication where pubname='supabase_realtime') then
     foreach t in array array['clubs','events','event_registrations','club_memberships','club_requests','room_reservations','tasks','budgets','budget_expenses'] loop
