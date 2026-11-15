@@ -104,7 +104,17 @@ export function AuthProvider({ children }) {
         },
       })
       if (error) {
-        throw new Error(friendlyAuthError({ ...error, email: normalizedEmail }, 'register', requestedRole))
+        // Auth errors inherit from Error; message is non-enumerable and is lost
+        // by object spread unless it is copied explicitly.
+        throw new Error(friendlyAuthError({
+          message: error.message,
+          code: error.code,
+          error_code: error.error_code,
+          status: error.status,
+          details: error.details,
+          hint: error.hint,
+          email: normalizedEmail,
+        }, 'register', requestedRole))
       }
       if (!data.session || !data.user) return { message: 'Compte créé. Confirmez votre adresse e-mail, puis connectez-vous.', pendingConfirmation: true, email: normalizedEmail }
       const profile = await fetchProfile(data.user.id)
