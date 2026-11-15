@@ -11,7 +11,7 @@ function friendlyAuthError(error, context = 'login') {
   const code = error?.code || error?.error_code || ''
   const message = `${code} ${error?.message || ''}`.toLowerCase()
   if (message.includes('over_email_send_rate_limit') || message.includes('email rate limit exceeded')) {
-    return 'Supabase a atteint sa limite d’envoi d’e-mails (2 par heure avec le service intégré). L’inscription est bloquée tant qu’un SMTP personnalisé n’est pas configuré dans Supabase. Réessayez après réinitialisation de la limite.'
+    return 'Supabase a atteint sa limite d’envoi d’e-mails (2 par heure avec le service intégré). L’administrateur doit configurer un SMTP personnalisé dans Supabase pour envoyer les confirmations aux étudiants.'
   }
   if (message.includes('email_address_not_authorized')) {
     return 'Le service e-mail Supabase de test n’envoie qu’aux adresses autorisées de l’équipe du projet. Configurez un SMTP personnalisé pour envoyer les confirmations aux étudiants.'
