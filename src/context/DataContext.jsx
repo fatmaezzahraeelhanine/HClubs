@@ -5,7 +5,7 @@ import { useAuth } from './AuthContext'
 
 const DataContext = createContext(null)
 const KEY = 'hestim_campus_data_v1'
-const initial = { clubs: INITIAL_CLUBS, events: INITIAL_EVENTS, tasks: INITIAL_TASKS, reservations: INITIAL_RESERVATIONS, clubRequests: INITIAL_CLUB_REQUESTS, memberships: {}, members: [], projects: [], rooms: [], budgetRows: [], budgetYear: new Date().getFullYear(), globalBudget: 0 }
+const initial = { clubs: INITIAL_CLUBS, events: INITIAL_EVENTS, tasks: INITIAL_TASKS, reservations: INITIAL_RESERVATIONS, clubRequests: INITIAL_CLUB_REQUESTS, memberships: {}, members: [], profiles: [], allowedRoles: [], projects: [], rooms: [], budgetRows: [], budgetYear: new Date().getFullYear(), globalBudget: 0 }
 function readData() { try { const saved = JSON.parse(localStorage.getItem(KEY)); return saved && typeof saved === 'object' ? { ...initial, ...saved } : initial } catch { return initial } }
 const normalize = value => value?.toLocaleLowerCase('fr') || ''
 
@@ -31,11 +31,11 @@ function mapReservation(row, rooms, profiles, equipment = []) {
 }
 
 async function fetchRemoteData() {
-  const tables = ['clubs', 'events', 'rooms', 'equipment', 'projects', 'tasks', 'room_reservations', 'budgets', 'budget_expenses', 'profiles', 'event_registrations', 'club_memberships', 'club_requests']
+  const tables = ['clubs', 'events', 'rooms', 'equipment', 'projects', 'tasks', 'room_reservations', 'budgets', 'budget_expenses', 'profiles', 'event_registrations', 'club_memberships', 'club_requests', 'allowed_roles']
   const results = await Promise.all(tables.map(table => supabase.from(table).select('*')))
   const failed = results.find(result => result.error)
   if (failed) throw failed.error
-  const [clubRows, eventRows, roomRows, equipmentRows, projectRows, taskRows, reservationRows, budgetRows, expenseRows, profiles, registrationRows, membershipRows, requestRows] = results.map(result => result.data || [])
+  const [clubRows, eventRows, roomRows, equipmentRows, projectRows, taskRows, reservationRows, budgetRows, expenseRows, profiles, registrationRows, membershipRows, requestRows, allowedRoleRows] = results.map(result => result.data || [])
   const clubs = clubRows.map(mapClub)
   const projects = projectRows.map(row => ({ ...row, clubId: row.club_id }))
   const rooms = roomRows
@@ -68,6 +68,8 @@ async function fetchRemoteData() {
     reservations: reservationRows.map(row => mapReservation(row, rooms, profiles, equipmentRows)),
     clubRequests: requestRows.map(row => ({ id: row.id, name: row.name, category: row.category, description: row.description, proposedBy: profiles.find(profile => profile.id === row.proposed_by)?.name || 'Étudiant HESTIM', email: profiles.find(profile => profile.id === row.proposed_by)?.email || '', status: row.status })),
     memberships,
+    profiles: profiles.map(row => ({ id: row.id, name: row.name, email: row.email, role: row.role, bureauRole: row.bureau_role, clubId: row.club_id })),
+    allowedRoles: allowedRoleRows.map(row => ({ email: row.email, role: row.role, bureauRole: row.bureau_role, clubId: row.club_id })),
     budgetRows,
     budgetYear,
     globalBudget: budgetByClub.get('__campus__') || 0,
@@ -183,7 +185,24 @@ export function DataProvider({ children }) {
     ? runRemote(async () => { const { error } = await supabase.from('events').update({ status }).eq('id', id); if (error) throw error })
     : localUpdate(d => ({ ...d, events: d.events.map(event => event.id === id ? { ...event, status } : event) }))
 
-  const value = useMemo(() => ({ ...data, joinClub, joinEvent, addEvent, addClubRequest, setClubRequestStatus, addTask, moveTask, updateTask, addReservation, setReservationStatus, setEventStatus, dbError, dataSynced, refreshData: refreshRemote, clearDbError: () => setDbError(''), usingSupabase: supabaseConfigured }), [data, dbError, dataSynced, user?.id])
+  const saveAllowedRole = assignment => {
+    const email = assignment.email.trim().toLowerCase()
+    if (!email.endsWith('@hestim.ma')) throw new Error('Utilisez une adresse institutionnelle @hestim.ma.')
+    if (!['bureau', 'member', 'admin'].includes(assignment.role)) throw new Error('Sélectionnez un rôle autorisé.')
+    const clubId = assignment.role === 'admin' ? null : assignment.clubId
+    if (assignment.role !== 'admin' && !data.clubs.some(club => club.id === clubId)) throw new Error('Choisissez un club existant.')
+    const row = { email, role: assignment.role, bureau_role: assignment.bureauRole || (assignment.role === 'admin' ? 'Administration' : assignment.role === 'member' ? 'Membre actif' : 'Bureau du club'), club_id: clubId }
+    if (supabaseConfigured) return runRemote(async () => { const { error } = await supabase.from('allowed_roles').upsert(row, { onConflict: 'email' }); if (error) throw error })
+    return localUpdate(d => ({ ...d, allowedRoles: [...d.allowedRoles.filter(item => item.email !== email), { email, role: row.role, bureauRole: row.bureau_role, clubId: row.club_id }] }))
+  }
+  const removeAllowedRole = email => {
+    const normalizedEmail = email.trim().toLowerCase()
+    if (normalizedEmail === user?.email?.toLowerCase() && user.role === 'admin') throw new Error('Vous ne pouvez pas retirer votre propre accès administrateur.')
+    if (supabaseConfigured) return runRemote(async () => { const { error } = await supabase.from('allowed_roles').delete().eq('email', normalizedEmail); if (error) throw error })
+    return localUpdate(d => ({ ...d, allowedRoles: d.allowedRoles.filter(item => item.email !== normalizedEmail) }))
+  }
+
+  const value = useMemo(() => ({ ...data, joinClub, joinEvent, addEvent, addClubRequest, setClubRequestStatus, addTask, moveTask, updateTask, addReservation, setReservationStatus, setEventStatus, saveAllowedRole, removeAllowedRole, dbError, dataSynced, refreshData: refreshRemote, clearDbError: () => setDbError(''), usingSupabase: supabaseConfigured }), [data, dbError, dataSynced, user?.id])
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
 }
 

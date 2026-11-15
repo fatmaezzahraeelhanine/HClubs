@@ -102,10 +102,55 @@ function BudgetModule({ user }) { const { clubs, reservations, globalBudget, glo
   </>
 }
 
+function AdminRoleManager() {
+  const { clubs, allowedRoles, profiles, saveAllowedRole, removeAllowedRole, usingSupabase } = useData()
+  const { user } = useAuth()
+  const [form, setForm] = useState({ email: '', role: 'bureau', bureauRole: 'Président', clubId: clubs[0]?.id || '' })
+  const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const updateRole = role => setForm(current => ({ ...current, role, bureauRole: role === 'admin' ? 'Administration' : role === 'member' ? 'Membre actif' : 'Président', clubId: role === 'admin' ? '' : current.clubId || clubs[0]?.id || '' }))
+  const submit = async event => {
+    event.preventDefault(); setError(''); setNotice(''); setBusy(true)
+    try {
+      const saved = await saveAllowedRole(form)
+      if (saved === false) throw new Error('Impossible d’enregistrer cette autorisation. Vérifiez le schéma et les droits admin Supabase.')
+      setNotice('Autorisation enregistrée. Si le profil existe déjà, son rôle sera synchronisé dans Supabase.')
+      setForm(current => ({ ...current, email: '' }))
+    } catch (cause) { setError(cause.message || 'Impossible d’enregistrer cette autorisation.') }
+    finally { setBusy(false) }
+  }
+  const revoke = async email => {
+    setError(''); setNotice('')
+    try {
+      const removed = await removeAllowedRole(email)
+      if (removed === false) throw new Error('Impossible de retirer cette autorisation. Vérifiez les règles de sécurité Supabase.')
+      setNotice(`Autorisation retirée pour ${email}. La personne conserve son compte, mais perd les droits du bureau.`)
+    } catch (cause) { setError(cause.message || 'Impossible de retirer cette autorisation.') }
+  }
+  const clubById = Object.fromEntries(clubs.map(club => [club.id, club.name]))
+  const profileByEmail = Object.fromEntries(profiles.map(profile => [profile.email.toLowerCase(), profile]))
+  return <section className="surface role-manager">
+    <div className="overview-section-head"><div><p className="section-eyebrow">ACCÈS ET RESPONSABILITÉS</p><h2>Autorisations des responsables</h2></div><span className="results-count">{allowedRoles.length} adresse{allowedRoles.length === 1 ? '' : 's'} autorisée{allowedRoles.length === 1 ? '' : 's'}</span></div>
+    <p className="role-manager-intro">Les étudiants HESTIM créent leur compte librement. Ajoutez ici les responsables du bureau et de l’administration. Si leur profil existe déjà, l’autorisation met à jour leurs droits sans recréer leur compte.</p>
+    <form className="role-manager-form" onSubmit={submit}>
+      <label className="field-label">Adresse HESTIM<input required type="email" className="modal-input" placeholder="nom@hestim.ma" value={form.email} onChange={event => setForm(current => ({ ...current, email: event.target.value }))} /></label>
+      <label className="field-label">Accès<select className="modal-input" value={form.role} onChange={event => updateRole(event.target.value)}><option value="bureau">Bureau du club</option><option value="member">Membre actif</option><option value="admin">Administration</option></select></label>
+      {form.role === 'bureau' && <label className="field-label">Fonction<select className="modal-input" value={form.bureauRole} onChange={event => setForm(current => ({ ...current, bureauRole: event.target.value }))}>{['Président', 'Vice-président', 'Secrétaire', 'Trésorier'].map(title => <option key={title}>{title}</option>)}</select></label>}
+      {form.role !== 'admin' && <label className="field-label">Club<select required className="modal-input" value={form.clubId} onChange={event => setForm(current => ({ ...current, clubId: event.target.value }))}><option value="">Choisir un club</option>{clubs.map(club => <option key={club.id} value={club.id}>{club.name}</option>)}</select></label>}
+      <button className="btn-primary" disabled={busy || !clubs.length && form.role !== 'admin'} type="submit"><Plus size={15} /> {busy ? 'Enregistrement…' : 'Autoriser cette adresse'}</button>
+    </form>
+    {error && <div className="form-alert error-alert role-manager-alert"><X size={15} /><span>{error}</span></div>}{notice && <div className="form-alert success-alert role-manager-alert"><Check size={15} /><span>{notice}</span></div>}
+    <div className="role-manager-list">{allowedRoles.length ? allowedRoles.map(item => { const profile = profileByEmail[item.email.toLowerCase()]; const isSelfAdmin = item.email.toLowerCase() === user.email.toLowerCase() && item.role === 'admin'; const title = item.role === 'admin' ? 'Administration' : item.role === 'member' ? 'Membre actif' : item.bureauRole || 'Bureau du club'; return <article className="role-manager-row" key={item.email}><div className="role-manager-avatar"><ShieldCheck size={17} /></div><div className="role-manager-person"><strong>{item.email}</strong><span>{title}{item.clubId ? ` · ${clubById[item.clubId] || 'Club associé'}` : ''}</span></div><span className={`role-account-state ${profile ? 'account-present' : ''}`}><i />{profile ? 'Profil présent' : 'Compte à créer'}</span><button className="role-revoke" type="button" disabled={isSelfAdmin} title={isSelfAdmin ? 'Conservez au moins un administrateur actif' : 'Retirer cette autorisation'} onClick={() => revoke(item.email)}><X size={16} /></button></article> }) : <div className="role-manager-empty">Aucune adresse autorisée. Ajoutez au moins un responsable pour commencer.</div>}</div>
+    <p className="role-manager-footnote">Le profil présent confirme la création du compte, pas la confirmation de son e-mail. Après une modification de rôle, la personne doit se reconnecter.</p>
+  </section>
+}
+
 function AdminControlPanel() { const { clubs, events, clubRequests, reservations, setEventStatus, setClubRequestStatus, usingSupabase } = useData(); const pending = events.filter(event => event.status === 'pending'); const pendingClubs = clubRequests.filter(request => request.status === 'pending'); const approvalTotal = pending.length + pendingClubs.length; const approved = events.filter(event => event.status === 'approved'); const memberTotal = clubs.every(club => club.members != null) ? clubs.reduce((sum, club) => sum + club.members, 0) : '—'; const clubById = Object.fromEntries(clubs.map(club => [club.id, club]))
   const exportReport = () => downloadCsv('hclubs-rapport-activite-2026-2027.csv', ['Club', 'Catégorie', 'Membres', 'Événements validés', 'Demandes en attente'], clubs.map(club => [club.name, club.category, club.members ?? '', events.filter(event => event.clubId === club.id && event.status === 'approved').length, reservations.filter(item => item.clubId === club.id && item.status === 'pending').length]))
   return <><PageTitle eyebrow="PILOTAGE HESTIM" title="Vue d’ensemble" subtitle="La vie associative de votre établissement, en un regard." action={<button className="btn-quiet" onClick={exportReport}><Download size={15} /> Rapport CSV</button>} />
     <div className="admin-stats"><article><span className="admin-stat-icon"><Users size={18} /></span><span>Membres des clubs</span><strong>{memberTotal}</strong><small><Check size={12} /> Total des adhésions enregistrées</small></article><article><span className="admin-stat-icon green"><Activity size={18} /></span><span>Clubs enregistrés</span><strong>{clubs.length}</strong><small><Check size={12} /> Année 2026 — 2027</small><div className="stat-ring"><span>{clubs.length}</span></div></article><article><span className="admin-stat-icon amber"><CalendarDays size={18} /></span><span>Événements validés</span><strong>{approved.length}</strong><small>{events.length} événements au total</small></article><article><span className="admin-stat-icon rose"><Clock3 size={18} /></span><span>À examiner</span><strong>{approvalTotal}</strong><small><span className="live-dot amber-dot" /> Nécessite votre attention</small><div className="attention-icon"><ShieldCheck size={34} /></div></article></div>
+    <AdminRoleManager />
     <div className="admin-grid"><section className="surface approval-surface"><div className="table-title"><div><p className="section-eyebrow">MODÉRATION</p><h2>À valider <span className="pending-count">{approvalTotal}</span></h2></div><span className="review-time"><Clock3 size={13} /> Mis à jour à l’instant</span></div>{approvalTotal ? <div className="approval-list">{pending.map(event => <article className="approval-row" key={event.id}><div className="approval-date"><CalendarDays size={17} /><span>{prettyDate(event.date)}</span></div><div className="approval-info"><h3>{event.title}</h3><span>{clubById[event.clubId]?.name || 'Club HESTIM'} · {event.location}</span></div><div className="approval-category">Événement · {event.category}</div><div className="approval-buttons"><button className="approve-action" onClick={() => setEventStatus(event.id, 'approved')} title="Approuver"><Check size={15} /></button><button className="reject-action" onClick={() => setEventStatus(event.id, 'rejected')} title="Refuser"><X size={15} /></button></div></article>)}{pendingClubs.map(request => <article className="approval-row" key={request.id}><div className="approval-date"><Users size={17} /><span>Club</span></div><div className="approval-info"><h3>{request.name}</h3><span>{request.proposedBy} · {request.category} — {request.description}</span></div><div className="approval-category">Nouveau club</div><div className="approval-buttons"><button className="approve-action" onClick={() => setClubRequestStatus(request.id, 'approved')} title="Approuver"><Check size={15} /></button><button className="reject-action" onClick={() => setClubRequestStatus(request.id, 'rejected')} title="Refuser"><X size={15} /></button></div></article>)}</div> : <EmptyState title="Tout est à jour" detail="Aucun événement ni club ne demande votre validation." />}</section>
       <section className="surface admin-activity"><div className="table-title"><div><p className="section-eyebrow">SUR LE CAMPUS</p><h2>Clubs · année 2026 — 2027</h2></div></div><div className="activity-list">{clubs.slice(0, 5).map(club => <div className="activity-row" key={club.id}><div className={`club-icon tiny club-${club.color}`}>{(() => { const Icon = clubIcons[club.icon] || Users; return <Icon size={16} /> })()}</div><div><strong>{club.name}</strong><span>{club.members ?? '—'} membres · {club.category}</span></div><span className="activity-live"><i /> Inscrit</span></div>)}</div><div className="activity-foot"><span>Communauté totale</span><strong>{memberTotal} <small>membres</small></strong><span className="activity-caption">{usingSupabase ? 'Adhésions lues depuis Supabase.' : 'Données de démonstration'}</span></div></section></div>
     <div className="admin-bottom-note"><span><ShieldCheck size={16} /> Panel administration HESTIM</span><span>Les changements sont enregistrés automatiquement.</span></div>
