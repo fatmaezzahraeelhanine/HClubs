@@ -42,7 +42,8 @@ async function hashPassword(password, salt = crypto.randomUUID()) {
   return { salt, hash: Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('') }
 }
 function toProfile(row) {
-  return { id: row.id, name: row.name, email: row.email, role: row.role, bureauRole: row.bureau_role || (row.role === 'student' ? 'Étudiant' : row.role), clubId: row.club_id }
+  const defaultBureauRole = { student: 'Étudiant', bureau: 'Bureau du club', member: 'Membre actif', admin: 'Administration' }[row.role] || row.role
+  return { id: row.id, name: row.name, email: row.email, role: row.role, bureauRole: row.bureau_role || defaultBureauRole, clubId: row.club_id }
 }
 async function fetchProfile(userId) {
   const { data, error } = await supabase.from('profiles').select('id,name,email,role,bureau_role,club_id').eq('id', userId).single()
