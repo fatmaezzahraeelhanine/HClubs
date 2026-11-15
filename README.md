@@ -11,37 +11,49 @@ npm run dev
 
 Le build de production se génère avec `npm run build` et se lance en aperçu avec `npm run preview`.
 
-## Connexion Supabase
+## Base de données Supabase
 
-Exécutez [`supabase/schema.sql`](supabase/schema.sql), puis [`supabase/migrations/20261113_hclubs_features.sql`](supabase/migrations/20261113_hclubs_features.sql) dans le SQL Editor de votre projet Supabase. L’URL et la clé publique publishable du projet sont configurées comme valeurs par défaut dans le client navigateur. `.env.local` peut les remplacer en développement. Une clé publishable est conçue pour l’application cliente; les politiques RLS protègent les données. Ne mettez jamais une clé `service_role` dans une application React.
+Le schéma de référence est [`supabase/schema.sql`](supabase/schema.sql). Ouvrez le SQL Editor du projet Supabase correspondant à l’URL configurée dans `src/lib/supabase.js`, collez le fichier complet et exécutez-le une fois. Le script crée ou complète les tables, installe les fonctions/triggers, remplace les anciennes policies permissives et active les abonnements Realtime disponibles.
 
-Quand les deux variables `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` sont définies, l’application utilise Supabase Auth et les tables SQL, en laissant les politiques RLS contrôler les accès. Sans elles, elle reste en mode démonstration `localStorage`.
+Le script est conçu pour mettre à niveau la première structure HClubs déjà déployée. Faites tout de même un export de sauvegarde Supabase avant de l’exécuter sur une base contenant des données importantes. Il ne supprime pas les comptes Auth ni les données existantes.
 
-Le code synchronise `profiles`, `clubs`, `club_memberships`, `events`, `event_registrations`, `rooms`, `room_reservations`, `projects`, `tasks` et `budgets`. Les changements sont relus après écriture et mis à jour en direct lorsque Supabase Realtime est activé. Les inscriptions aux événements passent par une fonction SQL transactionnelle qui bloque les doublons et les places au-delà de la capacité.
+Les tables couvrent les profils et rôles autorisés, clubs et demandes de création, adhésions, événements et inscriptions avec capacité, salles et matériel, demandes de réservation, projets et tâches Kanban, budgets annuels et dépenses.
 
-La migration ajoute la modération des événements, leur capacité, les inscriptions, les adhésions, les champs de tâche (statut, échéance, priorité, responsable) et les droits RLS des membres actifs. Le SQL ne gère toujours pas les dépenses réelles; le tableau de budget affiche donc les montants alloués et indique cette limite.
+### Règles d’accès
 
-Le SQL contient des adresses de démonstration pour la whitelist. Remplacez-les par les adresses réellement autorisées avant d’ouvrir l’inscription Supabase aux utilisateurs HESTIM.
+- Les comptes étudiants doivent utiliser une adresse `@hestim.ma`.
+- `allowed_roles` attribue les rôles bureau, membre actif et administration côté serveur. Le sélecteur de rôle de l’inscription ne confère aucun privilège.
+- RLS limite les événements publics approuvés, les tâches/réservations/budgets à l’équipe du club, et les actions de modération à l’administration.
+- Les inscriptions aux événements passent par une fonction SQL transactionnelle. Les places ne peuvent pas dépasser `max_places` même en cas d’inscriptions simultanées.
+- Les données sensibles ne doivent jamais être exposées avec une clé Supabase `service_role`. La clé publishable est la seule clé adaptée au navigateur.
 
-## Comptes de démonstration
+Le script ne crée volontairement aucun compte staff fictif. Avant d’inscrire les responsables, ajoutez leurs vraies adresses dans la whitelist, par exemple :
 
-Depuis l’écran de connexion, choisissez **Créer un compte**, puis l’un des boutons « Explorer la démo » pour préremplir un profil :
+```sql
+insert into public.allowed_roles(email, role, bureau_role, club_id) values
+  ('admin.reel@hestim.ma', 'admin', 'Administration', null),
+  ('president.reel@hestim.ma', 'bureau', 'Président', 'robotique')
+on conflict (email) do update
+set role = excluded.role, bureau_role = excluded.bureau_role, club_id = excluded.club_id;
+```
 
-- Étudiant : `etudiant@hestim.ma`
-- Bureau robotique : `president.robotique@hestim.ma`
-- Administration : `admin@hestim.ma`
+Inscrivez ensuite ces comptes via l’écran HClubs. Le trigger créera leurs profils et rôles depuis la whitelist. Supabase Auth doit également autoriser les adresses HESTIM selon la politique de l’établissement.
 
-Ces comptes préremplis servent au mode local uniquement. Les profils locaux sont enregistrés dans le navigateur; les mots de passe y sont stockés sous forme d’empreintes salées. En mode Supabase, le trigger SQL attribue le rôle depuis `allowed_roles`.
+### Connexion de l’application
+
+Le client utilise `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`; créez `.env.local` pour le développement et définissez les mêmes variables dans Vercel pour la production. Sans configuration Supabase, l’application reste en mode démonstration `localStorage`.
+
+Après l’installation, créez un utilisateur étudiant avec une adresse `@hestim.ma`. Pour créer l’administrateur ou un responsable, ajoutez son adresse dans `allowed_roles` avant l’inscription Auth; le trigger crée alors son profil et son adhésion avec le rôle autorisé.
 
 ## Architecture
 
-- `src/lib/supabase.js` : client Supabase configuré par variables d’environnement.
-- `src/lib/download.js` : export CSV et calendrier ICS.
-- `src/context/AuthContext.jsx` : Supabase Auth ou session locale de démonstration.
-- `src/context/DataContext.jsx` : synchronisation Supabase des clubs, événements, tâches, salles, réservations et budgets.
-- `supabase/migrations/20261113_hclubs_features.sql` : capacités, inscriptions, adhésions, tâches et politiques RLS additionnelles.
-- `src/data/mockData.js` : whitelist et données initiales.
-- `src/pages/AuthPage.jsx` : authentification et inscription.
-- `src/pages/Dashboard.jsx` : vues campus, calendrier, Kanban, réservations, budget et administration.
+- `src/lib/supabase.js` : client Supabase.
+- `src/lib/download.js` : exports CSV et calendrier ICS.
+- `src/context/AuthContext.jsx` : Supabase Auth ou session de démonstration locale.
+- `src/context/DataContext.jsx` : synchronisation des clubs, événements, membres, tâches, ressources, réservations et budgets.
+- `supabase/schema.sql` : schéma complet, seeds, fonctions, triggers et politiques RLS.
+- `src/data/mockData.js` : données du mode local et adresses de démonstration.
+- `src/pages/AuthPage.jsx` : connexion et inscription.
+- `src/pages/Dashboard.jsx` : annuaire, calendrier, Kanban, réservations, budget et administration.
 
-En mode Supabase, les règles d’accès de production doivent rester dans les politiques RLS côté base. Le mode local est uniquement destiné à la démonstration.
+Le mode `localStorage` sert à la démonstration. Pour la sécurité en production, les règles Supabase RLS restent l’autorité finale.
