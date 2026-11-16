@@ -14,11 +14,13 @@ function setup(role, authError = null) {
   let listener
   let signInCalls = 0
   let signOutCalls = 0
+  let signupPayload
   const effects = []
   const profile = { id: 'user-1', email: 'person@hestim.ma', role, name: 'Test' }
   const supabase = {
     from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: profile }) }) }) }),
     auth: {
+      signUp: async payload => { signupPayload = payload; return { data: { user: profile, session: null } } },
       getSession: async () => ({ data: { session: null } }),
       onAuthStateChange: callback => { listener = callback; return { data: { subscription: { unsubscribe() {} } } } },
       signInWithPassword: async () => {
@@ -41,23 +43,15 @@ function setup(role, authError = null) {
   })
   const auth = vm.runInContext(`${source}\nAuthProvider({ children: null })`, context)
   effects.forEach(effect => effect())
-  return { auth, user: () => user, signInCalls: () => signInCalls, signOutCalls: () => signOutCalls }
+  return { auth, signupPayload: () => signupPayload, user: () => user, signInCalls: () => signInCalls, signOutCalls: () => signOutCalls }
 }
 
 for (const role of ['student', 'member', 'bureau', 'admin']) {
-  test(`${role} can log in through its matching entry`, async () => {
+  test(`${role} can log in through the shared form`, async () => {
     const app = setup(role)
-    await app.auth.login({ email: 'person@hestim.ma', password: 'real-password', loginType: role === 'admin' ? 'admin' : 'student' })
+    await app.auth.login({ email: 'person@hestim.ma', password: 'real-password' })
     assert.equal(app.user()?.role, role)
     assert.equal(app.signOutCalls(), 0)
-  })
-}
-for (const [role, loginType] of [['student', 'admin'], ['admin', 'student']]) {
-  test(`${role} is rejected through ${loginType}, including the auth callback`, async () => {
-    const app = setup(role)
-    await assert.rejects(app.auth.login({ email: 'person@hestim.ma', password: 'real-password', loginType }))
-    assert.equal(app.user(), null)
-    assert.equal(app.signOutCalls(), 1)
   })
 }
 test('former demo credentials go to Supabase and cannot bypass invalid credentials', async () => {
@@ -66,8 +60,18 @@ test('former demo credentials go to Supabase and cannot bypass invalid credentia
   assert.equal(app.signInCalls(), 1)
   assert.equal(app.user(), null)
 })
-test('invalid login selection is rejected before authentication', async () => {
+for (const signupType of ['student', 'admin']) {
+  test(`${signupType} signup records a request without assigning a role`, async () => {
+    const app = setup('student')
+    const result = await app.auth.register({ name: 'New User', email: 'new@hestim.ma', password: 'password123', signupType })
+    assert.equal(app.signupPayload().options.data.requested_role, signupType)
+    assert.equal(app.signupPayload().options.data.role, undefined)
+    assert.equal(app.user(), null)
+    assert.equal(result.pendingConfirmation, true)
+  })
+}
+test('invalid signup selection is rejected before account creation', async () => {
   const app = setup('student')
-  await assert.rejects(app.auth.login({ email: 'person@hestim.ma', password: 'secret', loginType: 'owner' }))
-  assert.equal(app.signInCalls(), 0)
+  await assert.rejects(app.auth.register({ name: 'New', email: 'new@hestim.ma', password: 'password123', signupType: 'owner' }))
+  assert.equal(app.signupPayload(), undefined)
 })

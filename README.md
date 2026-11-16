@@ -22,12 +22,12 @@ Les tables couvrent les profils et rôles autorisés, clubs et demandes de créa
 ### Règles d’accès
 
 - Les comptes étudiants doivent utiliser une adresse `@hestim.ma`.
-- `allowed_roles` attribue les rôles bureau, membre actif et administration côté serveur. Le formulaire d’inscription n’affiche aucun sélecteur de rôle.
+- `allowed_roles` attribue les rôles bureau, membre actif et administration côté serveur. Le choix à l’inscription est une demande; les droits restent attribués côté serveur.
 - RLS limite les événements publics approuvés, les tâches/réservations/budgets à l’équipe du club, et les actions de modération à l’administration.
 - Les inscriptions aux événements passent par une fonction SQL transactionnelle. Les places ne peuvent pas dépasser `max_places` même en cas d’inscriptions simultanées.
 - Les données sensibles ne doivent jamais être exposées avec une clé Supabase `service_role`. La clé publishable est la seule clé adaptée au navigateur.
 
-Tous les utilisateurs suivent le même formulaire avec une adresse `@hestim.ma`. Supabase attribue le rôle étudiant par défaut, ou celui déjà associé à l’adresse dans `allowed_roles`. Le formulaire ne demande jamais à l’utilisateur de choisir ses droits.
+Tous les utilisateurs suivent le même formulaire avec une adresse `@hestim.ma`. Supabase attribue le rôle étudiant par défaut, ou celui déjà associé à l’adresse dans `allowed_roles`. Le choix du type de compte ne modifie pas les droits attribués par Supabase.
 
 Pour autoriser les responsables d’un bureau, l’admin ajoute leurs vraies adresses HESTIM dans le même panneau, choisit la fonction (président, vice-président, secrétaire ou trésorier) et le club. Les étudiants conservent l’inscription libre avec leur adresse `@hestim.ma`.
 
@@ -66,10 +66,10 @@ Après l’installation, créez un utilisateur étudiant avec une adresse `@hest
 
 Les règles Supabase RLS restent l’autorité finale pour les permissions.
 
-## Connexion étudiant / administrateur
+## Inscription étudiant / administrateur
 
-La page de connexion propose Étudiant (également pour les membres actifs et bureaux) ou Administrateur. Ce choix ne donne aucun droit : le profil Supabase doit correspondre au type choisi. Un compte administrateur doit choisir Administrateur; les autres comptes doivent choisir Étudiant.
+La création de compte propose Étudiant ou Administrateur. Le choix est enregistré dans les métadonnées Auth de l’utilisateur, sous `requested_role`. Il exprime une demande et ne donne aucun droit. Dans Supabase, consultez **Authentication → Users** et les métadonnées du compte pour identifier les demandes administrateur.
 
-Pour le premier administrateur, ajoutez sa vraie adresse `@hestim.ma` dans Supabase **Table Editor → allowed_roles**, avec `role = admin`, `bureau_role = Administration` et `club_id = NULL`. Créez ensuite le compte via HClubs, confirmez son e-mail, puis connectez-vous en sélectionnant Administrateur. Pour un compte existant, le trigger de synchronisation du schéma doit être installé; reconnectez-vous après la modification.
+Pour autoriser un administrateur, ajoutez sa vraie adresse `@hestim.ma` dans **Table Editor → allowed_roles**, avec `role = admin`, `bureau_role = Administration` et `club_id = NULL`. Le trigger de synchronisation du schéma doit être installé pour mettre à jour un profil existant. La personne doit ensuite se reconnecter.
 
-L’inscription ne permet pas de choisir un rôle. Aucun compte ou mot de passe de démonstration n’est accepté par l’application.
+La connexion est identique pour tous : les droits viennent du profil Supabase. Aucun compte ou mot de passe de démonstration n’est accepté par l’application.

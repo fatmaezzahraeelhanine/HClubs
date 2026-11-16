@@ -11,7 +11,7 @@ const features = [
 export default function AuthPage() {
   const { login, register, resendConfirmation, authError, clearAuthError, usingSupabase } = useAuth()
   const [mode, setMode] = useState('login')
-  const [loginType, setLoginType] = useState('student')
+  const [signupType, setSignupType] = useState('student')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -28,9 +28,9 @@ export default function AuthPage() {
     event.preventDefault(); setError(''); setSuccess(''); setConfirmationEmail(''); setLoading(true)
     try {
       if (isRegister) {
-        const result = await register(form)
+        const result = await register({ ...form, signupType })
         if (result?.message) { setSuccess(result.message); setConfirmationEmail(result.pendingConfirmation ? result.email : '') }
-      } else await login({ ...form, loginType })
+      } else await login(form)
     } catch (cause) { setError(cause.message || 'Une erreur est survenue.') }
     finally { setLoading(false) }
   }
@@ -63,7 +63,7 @@ export default function AuthPage() {
         <div className="auth-top-note"><span className="secure-label"><LockKeyhole size={12} /> ESPACE SÉCURISÉ</span><a className="help-button" href="mailto:clubs@hestim.ma" title="Contacter l’aide" aria-label="Contacter l’aide"><CircleHelp size={18} /></a></div>
         <div className="auth-heading"><p className="auth-kicker">BIENVENUE SUR LE CAMPUS</p><h2>{isRegister ? 'Créer votre compte' : 'Ravi de vous revoir.'}</h2><p>{isRegister ? 'Rejoignez la communauté associative HESTIM.' : 'Connectez-vous pour retrouver votre espace.'}</p></div>
         <div className="auth-tabs"><button onClick={() => changeMode('login')} className={!isRegister ? 'active' : ''}>Se connecter</button><button onClick={() => changeMode('register')} className={isRegister ? 'active' : ''}>Créer un compte</button></div>
-        {!isRegister && <fieldset className="login-type"><legend>Se connecter en tant que</legend><div className="login-type-options">{[{ value: 'student', label: 'Étudiant', Icon: Users }, { value: 'admin', label: 'Administrateur', Icon: ShieldCheck }].map(({ value, label, Icon }) => <label key={value} className={loginType === value ? 'selected' : ''}><input type="radio" name="loginType" value={value} checked={loginType === value} disabled={loading} onChange={() => { setLoginType(value); setError(''); clearAuthError() }} /><Icon size={16} />{label}</label>)}</div><p>{loginType === 'admin' ? 'Connectez-vous avec votre compte administrateur autorisé.' : 'Pour les étudiants, les membres actifs et les responsables de club.'}</p></fieldset>}
+        {isRegister && <fieldset className="login-type"><legend>Créer un compte en tant que</legend><div className="login-type-options">{[{ value: 'student', label: 'Étudiant', Icon: Users }, { value: 'admin', label: 'Administrateur', Icon: ShieldCheck }].map(({ value, label, Icon }) => <label key={value} className={signupType === value ? 'selected' : ''}><input type="radio" name="signupType" value={value} checked={signupType === value} disabled={loading} onChange={() => { setSignupType(value); setError(''); clearAuthError() }} /><Icon size={16} />{label}</label>)}</div><p>{signupType === 'admin' ? 'Votre demande sera indiquée à l’administration. L’accès administrateur doit être autorisé avant activation.' : 'Pour les étudiants, les membres actifs et les responsables de club.'}</p></fieldset>}
         {(error || authError) && <div className="form-alert error-alert"><X size={16} /><span>{currentError}{canResendAfterError && <button type="button" disabled={resending} onClick={resendEmail} className="resend-confirmation">{resending ? 'Envoi…' : 'Renvoyer le mail de confirmation'}</button>}</span></div>}
         {success && <div className="form-alert success-alert"><Check size={16} /><span>{success}{confirmationEmail && <> <button type="button" disabled={resending} onClick={resendEmail} className="resend-confirmation">{resending ? 'Envoi…' : 'Renvoyer le mail'}</button></>}</span></div>}
         <form className="auth-form" onSubmit={submit}>
@@ -74,7 +74,7 @@ export default function AuthPage() {
           <button className="submit-button" disabled={loading} type="submit">{loading ? 'Un instant…' : isRegister ? 'Créer mon compte' : 'Accéder à mon espace'}<ArrowRight size={17} /></button>
         </form>
         <div className="form-bottom"><span>{isRegister ? 'Déjà membre ?' : 'Vous n’avez pas encore de compte ?'}</span><button onClick={() => changeMode(isRegister ? 'login' : 'register')}>{isRegister ? 'Se connecter' : 'Créer un compte'} <ArrowUpRight size={12} /></button></div>
-        {isRegister && <div className="access-note"><ShieldCheck size={16} /><span>Inscription simple avec une adresse @hestim.ma. Les accès bureau et administration sont activés uniquement si l’administration a autorisé votre adresse.</span></div>}
+        {isRegister && <div className="access-note"><ShieldCheck size={16} /><span>Le choix Administrateur est une demande d’accès. Seule une autorisation de l’administration active ces droits.</span></div>}
 
       </div>
       <div className="auth-legal"><span>En continuant, vous acceptez les conditions d’utilisation de HESTIM.</span><a href="mailto:clubs@hestim.ma">Confidentialité</a></div>
