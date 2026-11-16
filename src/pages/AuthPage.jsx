@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowRight, ArrowUpRight, CalendarDays, Check, ChevronRight, CircleHelp, Cpu, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Sparkles, Users, X } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, CalendarDays, Check, ChevronRight, CircleHelp, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Sparkles, Users, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const features = [
@@ -11,6 +11,7 @@ const features = [
 export default function AuthPage() {
   const { login, register, resendConfirmation, authError, clearAuthError, usingSupabase } = useAuth()
   const [mode, setMode] = useState('login')
+  const [loginType, setLoginType] = useState('student')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -29,7 +30,7 @@ export default function AuthPage() {
       if (isRegister) {
         const result = await register(form)
         if (result?.message) { setSuccess(result.message); setConfirmationEmail(result.pendingConfirmation ? result.email : '') }
-      } else await login(form)
+      } else await login({ ...form, loginType })
     } catch (cause) { setError(cause.message || 'Une erreur est survenue.') }
     finally { setLoading(false) }
   }
@@ -40,16 +41,6 @@ export default function AuthPage() {
     catch (cause) { setError(cause.message || 'Impossible de renvoyer l’e-mail.') }
     finally { setResending(false) }
   }
-  const demoLogin = (role, email, name) => {
-    setMode('login'); setError(''); setForm({ name, email, password: 'HClubsDemo2026!' })
-    setSuccess(`Compte ${role} chargé. Cliquez sur « Accéder à mon espace ».`)
-  }
-  const openPresentationMode = () => {
-    const url = new URL(window.location.href)
-    url.searchParams.set('demo', '1')
-    window.location.assign(url.toString())
-  }
-
   return <main className="auth-page">
     <section className="auth-hero">
       <div className="hero-grain" />
@@ -72,6 +63,7 @@ export default function AuthPage() {
         <div className="auth-top-note"><span className="secure-label"><LockKeyhole size={12} /> ESPACE SÉCURISÉ</span><a className="help-button" href="mailto:clubs@hestim.ma" title="Contacter l’aide" aria-label="Contacter l’aide"><CircleHelp size={18} /></a></div>
         <div className="auth-heading"><p className="auth-kicker">BIENVENUE SUR LE CAMPUS</p><h2>{isRegister ? 'Créer votre compte' : 'Ravi de vous revoir.'}</h2><p>{isRegister ? 'Rejoignez la communauté associative HESTIM.' : 'Connectez-vous pour retrouver votre espace.'}</p></div>
         <div className="auth-tabs"><button onClick={() => changeMode('login')} className={!isRegister ? 'active' : ''}>Se connecter</button><button onClick={() => changeMode('register')} className={isRegister ? 'active' : ''}>Créer un compte</button></div>
+        {!isRegister && <fieldset className="login-type"><legend>Se connecter en tant que</legend><div className="login-type-options">{[{ value: 'student', label: 'Étudiant', Icon: Users }, { value: 'admin', label: 'Administrateur', Icon: ShieldCheck }].map(({ value, label, Icon }) => <label key={value} className={loginType === value ? 'selected' : ''}><input type="radio" name="loginType" value={value} checked={loginType === value} disabled={loading} onChange={() => { setLoginType(value); setError(''); clearAuthError() }} /><Icon size={16} />{label}</label>)}</div><p>{loginType === 'admin' ? 'Connectez-vous avec votre compte administrateur autorisé.' : 'Pour les étudiants, les membres actifs et les responsables de club.'}</p></fieldset>}
         {(error || authError) && <div className="form-alert error-alert"><X size={16} /><span>{currentError}{canResendAfterError && <button type="button" disabled={resending} onClick={resendEmail} className="resend-confirmation">{resending ? 'Envoi…' : 'Renvoyer le mail de confirmation'}</button>}</span></div>}
         {success && <div className="form-alert success-alert"><Check size={16} /><span>{success}{confirmationEmail && <> <button type="button" disabled={resending} onClick={resendEmail} className="resend-confirmation">{resending ? 'Envoi…' : 'Renvoyer le mail'}</button></>}</span></div>}
         <form className="auth-form" onSubmit={submit}>
@@ -83,7 +75,7 @@ export default function AuthPage() {
         </form>
         <div className="form-bottom"><span>{isRegister ? 'Déjà membre ?' : 'Vous n’avez pas encore de compte ?'}</span><button onClick={() => changeMode(isRegister ? 'login' : 'register')}>{isRegister ? 'Se connecter' : 'Créer un compte'} <ArrowUpRight size={12} /></button></div>
         {isRegister && <div className="access-note"><ShieldCheck size={16} /><span>Inscription simple avec une adresse @hestim.ma. Les accès bureau et administration sont activés uniquement si l’administration a autorisé votre adresse.</span></div>}
-        {usingSupabase ? <><div className="access-note"><ShieldCheck size={16} /><span>Le rôle étudiant est attribué par défaut. Un rôle préautorisé est appliqué automatiquement après confirmation de l’adresse.</span></div><div className="demo-access"><div className="demo-heading"><span>Présentation du site</span><span>ESPACE DE TEST</span></div><p className="demo-description">Découvrez les vues étudiant, membre, bureau et administration avec des données fictives. Cela ne modifie pas la base HESTIM.</p><button className="demo-entry-button" type="button" onClick={openPresentationMode}>Ouvrir les comptes de démonstration <ArrowRight size={14} /></button></div></> : <div className="demo-access"><div className="demo-heading"><span>Explorer la démo</span><span>DONNÉES LOCALES</span></div><div className="demo-actions"><button type="button" onClick={() => demoLogin('Étudiant', 'demo.etudiant@hestim.ma', 'Étudiant Démo')}><Users size={14} /> Étudiant</button><button type="button" onClick={() => demoLogin('Membre actif', 'demo.membre@hestim.ma', 'Membre Démo')}><Users size={14} /> Membre actif</button><button type="button" onClick={() => demoLogin('Bureau', 'demo.bureau@hestim.ma', 'Président Démo')}><Cpu size={14} /> Bureau</button><button type="button" onClick={() => demoLogin('Administration', 'demo.admin@hestim.ma', 'Administration Démo')}><ShieldCheck size={14} /> Admin</button></div><p><LockKeyhole size={11} /> Mode de démonstration isolé : aucune modification n’est envoyée à Supabase. Mot de passe commun : HClubsDemo2026!</p></div>}
+
       </div>
       <div className="auth-legal"><span>En continuant, vous acceptez les conditions d’utilisation de HESTIM.</span><a href="mailto:clubs@hestim.ma">Confidentialité</a></div>
     </section>

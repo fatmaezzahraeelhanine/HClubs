@@ -47,7 +47,7 @@ Inscrivez ensuite ces comptes via l’écran HClubs. Le trigger créera leurs pr
 
 ### Connexion de l’application
 
-Le client utilise `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` et `VITE_AUTH_REDIRECT_URL`; créez `.env.local` pour le développement et définissez ces variables dans Vercel pour la production. La redirection de confirmation par défaut vise `https://h-clubs.vercel.app`, jamais une URL Vercel de prévisualisation. Dans Supabase > Authentication > URL Configuration, définissez cette URL comme **Site URL** et ajoutez `https://h-clubs.vercel.app/**` aux **Redirect URLs**. Ajoutez aussi les URLs locales de développement (`http://localhost:5173/**` et `http://127.0.0.1:5173/**`) si nécessaire. Sans configuration Supabase, l’application reste en mode démonstration `localStorage`.
+Le client utilise `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` et `VITE_AUTH_REDIRECT_URL`; créez `.env.local` pour le développement et définissez ces variables dans Vercel pour la production. La redirection de confirmation par défaut vise `https://h-clubs.vercel.app`, jamais une URL Vercel de prévisualisation. Dans Supabase > Authentication > URL Configuration, définissez cette URL comme **Site URL** et ajoutez `https://h-clubs.vercel.app/**` aux **Redirect URLs**. Ajoutez aussi les URLs locales de développement (`http://localhost:5173/**` et `http://127.0.0.1:5173/**`) si nécessaire. L’authentification utilise uniquement Supabase; les comptes de démonstration et le paramètre `?demo=1` ont été supprimés.
 
 Pour mettre à jour un projet existant avec le parcours simplifié, exécutez une fois [`supabase/migrations/20261118_simple_auth_signup.sql`](supabase/migrations/20261118_simple_auth_signup.sql) dans Supabase SQL Editor.
 
@@ -57,11 +57,19 @@ Après l’installation, créez un utilisateur étudiant avec une adresse `@hest
 
 - `src/lib/supabase.js` : client Supabase.
 - `src/lib/download.js` : exports CSV et calendrier ICS.
-- `src/context/AuthContext.jsx` : Supabase Auth ou session de démonstration locale.
+- `src/context/AuthContext.jsx` : Supabase Auth et validation du type de connexion choisi.
 - `src/context/DataContext.jsx` : synchronisation des clubs, événements, membres, tâches, ressources, réservations et budgets.
 - `supabase/schema.sql` : schéma complet, seeds, fonctions, triggers et politiques RLS.
-- `src/data/mockData.js` : données du mode local et adresses de démonstration.
+- `src/data/mockData.js` : données initiales et métadonnées de présentation des clubs.
 - `src/pages/AuthPage.jsx` : connexion et inscription.
 - `src/pages/Dashboard.jsx` : annuaire, calendrier, Kanban, réservations, budget et administration.
 
-Le mode `localStorage` sert à la démonstration. Pour la sécurité en production, les règles Supabase RLS restent l’autorité finale.
+Les règles Supabase RLS restent l’autorité finale pour les permissions.
+
+## Connexion étudiant / administrateur
+
+La page de connexion propose Étudiant (également pour les membres actifs et bureaux) ou Administrateur. Ce choix ne donne aucun droit : le profil Supabase doit correspondre au type choisi. Un compte administrateur doit choisir Administrateur; les autres comptes doivent choisir Étudiant.
+
+Pour le premier administrateur, ajoutez sa vraie adresse `@hestim.ma` dans Supabase **Table Editor → allowed_roles**, avec `role = admin`, `bureau_role = Administration` et `club_id = NULL`. Créez ensuite le compte via HClubs, confirmez son e-mail, puis connectez-vous en sélectionnant Administrateur. Pour un compte existant, le trigger de synchronisation du schéma doit être installé; reconnectez-vous après la modification.
+
+L’inscription ne permet pas de choisir un rôle. Aucun compte ou mot de passe de démonstration n’est accepté par l’application.

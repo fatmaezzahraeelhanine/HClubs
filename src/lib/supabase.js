@@ -5,10 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 const url = import.meta.env.VITE_SUPABASE_URL?.trim() || 'https://tpatppstlkslhqzmayir.supabase.co'
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() || 'sb_publishable_Xxy_81hjMOgqFqbhegsM_w_PQf7J80X'
 
-// ?demo=1 switches this browser session to local mock data only.
-export const presentationMode = typeof window !== 'undefined'
-  && new URLSearchParams(window.location.search).get('demo') === '1'
-export const supabaseConfigured = Boolean(url && anonKey) && !presentationMode
+export const supabaseConfigured = Boolean(url && anonKey)
 export const supabase = supabaseConfigured ? createClient(url, anonKey, {
   auth: {
     persistSession: true,

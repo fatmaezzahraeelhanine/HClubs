@@ -1,13 +1,8 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { ALLOWED_ROLES, DEMO_ACCOUNTS } from '../data/mockData'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase, supabaseConfigured } from '../lib/supabase'
 
 const AuthContext = createContext(null)
-const SESSION_KEY = 'hestim_session_v1'
-const ACCOUNTS_KEY = 'hestim_accounts_v1'
-const DEMO_PASSWORD = 'HClubsDemo2026!'
 const AUTH_REDIRECT_URL = import.meta.env.VITE_AUTH_REDIRECT_URL?.trim() || 'https://h-clubs.vercel.app'
-const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback } catch { return fallback } }
 function friendlyAuthError(error, context = 'login') {
   const code = error?.code || error?.error_code || ''
   const message = `${code} ${error?.message || ''}`.toLowerCase()
@@ -25,20 +20,6 @@ function friendlyAuthError(error, context = 'login') {
   if (context === 'register' && message.includes('already registered')) return 'Cette adresse possède déjà un compte. Connectez-vous ou demandez un nouveau mail de confirmation.'
   return error?.message || 'Une erreur est survenue.'
 }
-function restoreSession() {
-  try {
-    const saved = JSON.parse(sessionStorage.getItem(SESSION_KEY))
-    if (!saved?.email?.endsWith('@hestim.ma')) return null
-    const allowed = ALLOWED_ROLES.find(item => item.email === saved.email)
-    if (allowed) return saved.role === allowed.role && saved.clubId === allowed.clubId ? { ...allowed, name: saved.name || allowed.name } : null
-    return saved.role === 'student' ? { name: saved.name, email: saved.email, role: 'student', bureauRole: 'Étudiant', clubId: null } : null
-  } catch { return null }
-}
-async function hashPassword(password, salt = crypto.randomUUID()) {
-  const encoded = new TextEncoder().encode(`${salt}:${password}`)
-  const digest = await crypto.subtle.digest('SHA-256', encoded)
-  return { salt, hash: Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('') }
-}
 function toProfile(row) {
   const defaultBureauRole = { student: 'Étudiant', bureau: 'Bureau du club', member: 'Membre actif', admin: 'Administration' }[row.role] || row.role
   return { id: row.id, name: row.name, email: row.email, role: row.role, bureauRole: row.bureau_role || defaultBureauRole, clubId: row.club_id }
@@ -51,8 +32,9 @@ async function fetchProfile(userId) {
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => supabaseConfigured ? null : restoreSession())
+  const [user, setUser] = useState(null)
   const [authError, setAuthError] = useState('')
+  const loginInProgress = useRef(false)
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.hash) {
@@ -67,98 +49,80 @@ export function AuthProvider({ children }) {
       supabase.auth.getSession().then(async ({ data, error }) => {
         if (error) { if (active) setAuthError(error.message); return }
         if (data.session?.user) {
-          try { const profile = await fetchProfile(data.session.user.id); if (active) setUser(profile) }
+          try { const profile = await fetchProfile(data.session.user.id); if (active && !loginInProgress.current) setUser(profile) }
           catch (cause) { if (active) setAuthError(cause.message) }
         } else if (active) setUser(null)
       })
       const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (loginInProgress.current) return
         if (!session?.user) { if (active) setUser(null); return }
         queueMicrotask(async () => {
-          try { const profile = await fetchProfile(session.user.id); if (active) { setUser(profile); setAuthError('') } }
+          try { const profile = await fetchProfile(session.user.id); if (active && !loginInProgress.current) { setUser(profile); setAuthError('') } }
           catch (cause) { if (active) setAuthError(cause.message) }
         })
       })
       return () => { active = false; listener.subscription.unsubscribe() }
     }
   }, [])
-  useEffect(() => {
-    if (supabaseConfigured) return
-    if (user) sessionStorage.setItem(SESSION_KEY, JSON.stringify(user)); else sessionStorage.removeItem(SESSION_KEY)
-  }, [user])
-
   const register = async ({ name, email, password }) => {
     const normalizedEmail = email.trim().toLowerCase()
     if (!normalizedEmail.endsWith('@hestim.ma')) throw new Error('Utilisez votre adresse institutionnelle en @hestim.ma.')
     if (!name.trim() || password.length < 8) throw new Error('Renseignez votre nom et un mot de passe de 8 caractères minimum.')
     setAuthError('')
+    if (!supabaseConfigured) throw new Error('La connexion Supabase doit être configurée.')
 
-    if (supabaseConfigured) {
-      const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
+      email: normalizedEmail,
+      password,
+      options: {
+        data: { name: name.trim() },
+        emailRedirectTo: AUTH_REDIRECT_URL,
+      },
+    })
+    if (error) {
+      // Auth errors inherit from Error; message is non-enumerable and is lost
+      // by object spread unless it is copied explicitly.
+      throw new Error(friendlyAuthError({
+        message: error.message,
+        code: error.code,
+        error_code: error.error_code,
+        status: error.status,
+        details: error.details,
+        hint: error.hint,
         email: normalizedEmail,
-        password,
-        options: {
-          data: { name: name.trim() },
-          emailRedirectTo: AUTH_REDIRECT_URL,
-        },
-      })
-      if (error) {
-        // Auth errors inherit from Error; message is non-enumerable and is lost
-        // by object spread unless it is copied explicitly.
-        throw new Error(friendlyAuthError({
-          message: error.message,
-          code: error.code,
-          error_code: error.error_code,
-          status: error.status,
-          details: error.details,
-          hint: error.hint,
-          email: normalizedEmail,
-        }, 'register'))
-      }
-      if (!data.session || !data.user) return { message: 'Compte créé. Confirmez votre adresse e-mail, puis connectez-vous.', pendingConfirmation: true, email: normalizedEmail }
-      const profile = await fetchProfile(data.user.id)
-      setUser(profile)
-      return { user: profile }
+      }, 'register'))
     }
-
-    const accounts = read(ACCOUNTS_KEY, [])
-    if (accounts.some(account => account.email === normalizedEmail)) throw new Error('Un compte existe déjà pour cette adresse.')
-    const allowed = ALLOWED_ROLES.find(item => item.email === normalizedEmail)
-    const profile = allowed
-      ? { ...allowed, name: name.trim() || allowed.name }
-      : { name: name.trim(), email: normalizedEmail, role: 'student', bureauRole: 'Étudiant', clubId: null }
-    const credentials = await hashPassword(password)
-    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify([...accounts, { ...profile, ...credentials }]))
+    if (!data.session || !data.user) return { message: 'Compte créé. Confirmez votre adresse e-mail, puis connectez-vous.', pendingConfirmation: true, email: normalizedEmail }
+    const profile = await fetchProfile(data.user.id)
     setUser(profile)
     return { user: profile }
   }
 
-  const login = async ({ email, password }) => {
+  const login = async ({ email, password, loginType = 'student' }) => {
     const normalizedEmail = email.trim().toLowerCase()
     if (!normalizedEmail.endsWith('@hestim.ma')) throw new Error('Utilisez votre adresse institutionnelle en @hestim.ma.')
+    if (!['student', 'admin'].includes(loginType)) throw new Error('Choisissez un type de connexion valide.')
+    if (!supabaseConfigured) throw new Error('La connexion Supabase doit être configurée.')
     setAuthError('')
-    if (supabaseConfigured) {
+    loginInProgress.current = true
+    try {
       const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password })
       if (error) throw new Error(friendlyAuthError(error, 'login'))
       const profile = await fetchProfile(data.user.id)
+      if ((loginType === 'admin') !== (profile.role === 'admin')) {
+        throw new Error(loginType === 'admin'
+          ? 'Ce compte ne possède pas d’accès administrateur. Choisissez Étudiant ou contactez l’administration.'
+          : 'Ce compte est administrateur. Choisissez Administrateur pour vous connecter.')
+      }
       setUser(profile)
       return { user: profile }
+    } catch (cause) {
+      setUser(null)
+      await supabase.auth.signOut({ scope: 'local' })
+      throw cause
+    } finally {
+      loginInProgress.current = false
     }
-    const demoAccount = DEMO_ACCOUNTS.find(item => item.email === normalizedEmail)
-    if (demoAccount) {
-      if (password !== DEMO_PASSWORD) throw new Error('Mot de passe démo incorrect. Utilisez HClubsDemo2026!.')
-      setUser(demoAccount)
-      return { user: demoAccount }
-    }
-    const account = read(ACCOUNTS_KEY, []).find(item => item.email === normalizedEmail)
-    if (!account) throw new Error('Adresse ou mot de passe incorrect. Créez un compte si vous êtes nouveau.')
-    const { hash } = await hashPassword(password, account.salt)
-    if (hash !== account.hash) throw new Error('Adresse ou mot de passe incorrect. Créez un compte si vous êtes nouveau.')
-    const allowed = ALLOWED_ROLES.find(item => item.email === normalizedEmail)
-    if (allowed && account.role !== allowed.role) throw new Error('Les droits de ce compte ne correspondent pas à la liste autorisée.')
-    if (!allowed && account.role !== 'student') throw new Error('Cette adresse n’est pas autorisée pour ce rôle.')
-    const { salt: _salt, hash: _hash, ...profile } = allowed ? { ...allowed, name: account.name } : { ...account, role: 'student', bureauRole: 'Étudiant', clubId: null }
-    setUser(profile)
-    return { user: profile }
   }
 
   const resendConfirmation = async email => {
