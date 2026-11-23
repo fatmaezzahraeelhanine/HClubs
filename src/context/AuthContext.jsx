@@ -67,7 +67,7 @@ export function AuthProvider({ children }) {
   const register = async ({ name, email, password, signupType = 'student' }) => {
     const normalizedEmail = email.trim().toLowerCase()
     if (!normalizedEmail.endsWith('@hestim.ma')) throw new Error('Utilisez votre adresse institutionnelle en @hestim.ma.')
-    if (!['student', 'admin'].includes(signupType)) throw new Error('Choisissez un type de compte valide.')
+    if (!['student', 'bureau', 'admin'].includes(signupType)) throw new Error('Choisissez un type de compte valide.')
     if (!name.trim() || password.length < 8) throw new Error('Renseignez votre nom et un mot de passe de 8 caractères minimum.')
     setAuthError('')
     if (!supabaseConfigured) throw new Error('La connexion Supabase doit être configurée.')
@@ -93,7 +93,7 @@ export function AuthProvider({ children }) {
         email: normalizedEmail,
       }, 'register'))
     }
-    if (!data.session || !data.user) return { message: signupType === 'admin' ? 'Compte créé. Confirmez votre e-mail. Votre demande administrateur doit être autorisée par l’administration avant de recevoir ces droits.' : 'Compte créé. Confirmez votre adresse e-mail, puis connectez-vous.', pendingConfirmation: true, email: normalizedEmail }
+      if (!data.session || !data.user) return { message: signupType === 'student' ? 'Compte créé. Confirmez votre adresse e-mail, puis connectez-vous.' : 'Compte créé. Confirmez votre adresse e-mail. Votre adresse a été vérifiée par l’administration pour recevoir ce rôle.', pendingConfirmation: true, email: normalizedEmail }
     const profile = await fetchProfile(data.user.id)
     setUser(profile)
     return { user: profile }

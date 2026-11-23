@@ -241,7 +241,8 @@ as $$ select public.is_admin() or exists (
   select 1 from public.club_memberships m
   join public.profiles p on p.id=m.user_id
   join public.allowed_roles w on w.email=p.email and w.club_id=m.club_id and w.role=m.membership_role and p.role=w.role and p.club_id=w.club_id
-  where m.user_id=auth.uid() and m.club_id=target_club and m.status='active' and m.membership_role in ('bureau','member')
+  where m.user_id=auth.uid() and m.club_id=target_club and m.status='active'
+    and m.membership_role='bureau' and p.role='bureau'
 ) $$;
 revoke all on function public.is_admin() from public;
 revoke all on function public.can_manage_club(text) from public;
@@ -259,22 +260,28 @@ grant execute on function public.is_club_member(text) to authenticated;
 create or replace function public.assign_profile_from_whitelist() returns trigger
 language plpgsql security definer set search_path = public,pg_temp
 as $$
-declare w public.allowed_roles%rowtype; n text;
+declare w public.allowed_roles%rowtype; n text; requested_role text;
 begin
   if lower(coalesce(new.email,'')) not like '%@hestim.ma' then raise exception 'Adresse institutionnelle @hestim.ma obligatoire'; end if;
   select * into w from public.allowed_roles where email=lower(new.email);
+  requested_role := coalesce(new.raw_user_meta_data->>'requested_role','student');
+  if requested_role not in ('student','bureau','admin') then
+    raise exception 'Type de compte invalide';
+  end if;
+  if requested_role <> 'student' and (not found or w.role <> requested_role) then
+    raise exception 'Cette adresse n’est pas préautorisée pour ce rôle';
+  end if;
   n := coalesce(nullif(trim(new.raw_user_meta_data->>'name'),''),split_part(new.email,'@',1));
   insert into public.profiles(id,name,email,role,bureau_role,club_id)
-  values(new.id,n,lower(new.email),coalesce(w.role,'student'),coalesce(w.bureau_role,'Étudiant'),w.club_id)
+  values(new.id,n,lower(new.email),case when requested_role='student' then 'student' else w.role end,case when requested_role='student' then 'Étudiant' else w.bureau_role end,case when requested_role='student' then null else w.club_id end)
   on conflict(id) do update set email=excluded.email;
-  if w.role='admin' then
-    return new;
-  elsif w.role in ('bureau','member') then
+  if requested_role='bureau' and w.role='bureau' and w.club_id is not null then
     insert into public.club_memberships(club_id,user_id,membership_role,status)
-    values(w.club_id,new.id,w.role,'active') on conflict(club_id,user_id) do update set membership_role=excluded.membership_role,status='active';
+    values(w.club_id,new.id,'bureau','active') on conflict(club_id,user_id) do update set membership_role=excluded.membership_role,status='active';
   end if;
   return new;
 end $$;
+revoke all on function public.assign_profile_from_whitelist() from public;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users
@@ -460,8 +467,8 @@ drop policy if exists events_create on public.events;
 create policy events_create on public.events for insert to authenticated with check(public.can_manage_club(club_id) and created_by=auth.uid() and status='pending');
 drop policy if exists events_review on public.events;
 create policy events_review on public.events for update to authenticated
-using(public.is_admin() or (public.can_manage_club(club_id) and status='pending'))
-with check(public.is_admin() or (public.can_manage_club(club_id) and status='pending'));
+using(public.is_admin())
+with check(public.is_admin());
 drop policy if exists registrations_read on public.event_registrations;
 create policy registrations_read on public.event_registrations for select to authenticated using(user_id=auth.uid() or public.is_admin() or exists(select 1 from public.events e where e.id=event_id and public.can_manage_club(e.club_id)));
 -- Aucune insertion directe : seule register_for_event peut enregistrer une présence,

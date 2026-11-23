@@ -22,12 +22,13 @@ Les tables couvrent les profils et rôles autorisés, clubs et demandes de créa
 ### Règles d’accès
 
 - Les comptes étudiants doivent utiliser une adresse `@hestim.ma`.
-- `allowed_roles` attribue les rôles bureau, membre actif et administration côté serveur. Le choix à l’inscription est une demande; les droits restent attribués côté serveur.
-- RLS limite les événements publics approuvés, les tâches/réservations/budgets à l’équipe du club, et les actions de modération à l’administration.
+- `allowed_roles` attribue les rôles bureau et administration côté serveur. Une adresse qui choisit Bureau ou Administration doit être préautorisée avant l’inscription.
+- Seul le bureau rattaché à un club peut gérer les tâches, proposer un événement et demander une réservation pour ce club. L’administration est la seule à accepter ou refuser les événements et réservations.
+- RLS limite les événements publics aux événements approuvés et bloque les opérations qui ne correspondent pas au club de la personne connectée.
 - Les inscriptions aux événements passent par une fonction SQL transactionnelle. Les places ne peuvent pas dépasser `max_places` même en cas d’inscriptions simultanées.
 - Les données sensibles ne doivent jamais être exposées avec une clé Supabase `service_role`. La clé publishable est la seule clé adaptée au navigateur.
 
-Tous les utilisateurs suivent le même formulaire avec une adresse `@hestim.ma`. Supabase attribue le rôle étudiant par défaut, ou celui déjà associé à l’adresse dans `allowed_roles`. Le choix du type de compte ne modifie pas les droits attribués par Supabase.
+Tous les utilisateurs suivent le même formulaire avec une adresse `@hestim.ma`. Ils reçoivent le mail de confirmation Supabase si **Confirm email** est activé dans **Authentication → Providers → Email**. L’étudiant est créé directement. Les choix Bureau et Administration demandent une entrée correspondante dans `allowed_roles`; le rôle final vient toujours de cette table.
 
 Pour autoriser les responsables d’un bureau, l’admin ajoute leurs vraies adresses HESTIM dans le même panneau, choisit la fonction (président, vice-président, secrétaire ou trésorier) et le club. Les étudiants conservent l’inscription libre avec leur adresse `@hestim.ma`.
 
@@ -50,6 +51,8 @@ Inscrivez ensuite ces comptes via l’écran HClubs. Le trigger créera leurs pr
 Le client utilise `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` et `VITE_AUTH_REDIRECT_URL`; créez `.env.local` pour le développement et définissez ces variables dans Vercel pour la production. La redirection de confirmation par défaut vise `https://h-clubs.vercel.app`, jamais une URL Vercel de prévisualisation. Dans Supabase > Authentication > URL Configuration, définissez cette URL comme **Site URL** et ajoutez `https://h-clubs.vercel.app/**` aux **Redirect URLs**. Ajoutez aussi les URLs locales de développement (`http://localhost:5173/**` et `http://127.0.0.1:5173/**`) si nécessaire. L’authentification utilise uniquement Supabase; les comptes de démonstration et le paramètre `?demo=1` ont été supprimés.
 
 Pour mettre à jour un projet existant avec le parcours simplifié, exécutez une fois [`supabase/migrations/20261118_simple_auth_signup.sql`](supabase/migrations/20261118_simple_auth_signup.sql) dans Supabase SQL Editor.
+
+Pour appliquer la logique Bureau uniquement sur une base existante, exécutez ensuite [`supabase/migrations/20261123_bureau_only_workflow.sql`](supabase/migrations/20261123_bureau_only_workflow.sql). Pour repartir de zéro, exécutez d’abord [`supabase/reset_database.sql`](supabase/reset_database.sql), puis le schéma complet. Cette opération efface les comptes et les données du projet Supabase.
 
 Après l’installation, créez un utilisateur étudiant avec une adresse `@hestim.ma`. Pour créer l’administrateur ou un responsable, ajoutez son adresse dans `allowed_roles` avant l’inscription Auth; le trigger crée alors son profil et son adhésion avec le rôle autorisé.
 

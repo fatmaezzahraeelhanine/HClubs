@@ -121,9 +121,12 @@ export function DataProvider({ children }) {
   const joinEvent = (eventId, userId) => supabaseConfigured
     ? runRemote(async () => { const { error } = await supabase.rpc('register_for_event', { requested_event_id: eventId }); if (error) throw error })
     : localUpdate(d => ({ ...d, events: d.events.map(event => event.id === eventId && !event.attendees.includes(userId) && event.attendees.length < event.maxPlaces ? { ...event, attendees: [...event.attendees, userId] } : event) }))
-  const addEvent = event => supabaseConfigured
-    ? runRemote(async () => { const { error } = await supabase.from('events').insert({ club_id: event.clubId, created_by: user.id, title: event.title, description: event.description, event_date: toIso(event.date, event.time), location: event.location, category: event.category, max_places: Number(event.maxPlaces), status: 'pending' }); if (error) throw error })
-    : localUpdate(d => ({ ...d, events: [{ ...event, id: crypto.randomUUID(), status: 'pending', attendees: [] }, ...d.events] }))
+  const addEvent = event => {
+    if (user.role !== 'bureau') throw new Error('Seul le bureau du club peut proposer un événement.')
+    return supabaseConfigured
+      ? runRemote(async () => { const { error } = await supabase.from('events').insert({ club_id: event.clubId, created_by: user.id, title: event.title, description: event.description, event_date: toIso(event.date, event.time), location: event.location, category: event.category, max_places: Number(event.maxPlaces), status: 'pending' }); if (error) throw error })
+      : localUpdate(d => ({ ...d, events: [{ ...event, id: crypto.randomUUID(), status: 'pending', attendees: [] }, ...d.events] }))
+  }
   const addClubRequest = request => supabaseConfigured
     ? runRemote(async () => { const { error } = await supabase.from('club_requests').insert({ name: request.name, category: request.category, description: request.description, proposed_by: user.id }); if (error) throw error })
     : localUpdate(d => ({ ...d, clubRequests: [{ ...request, id: crypto.randomUUID(), status: 'pending' }, ...d.clubRequests] }))
@@ -139,6 +142,7 @@ export function DataProvider({ children }) {
     })
 
   const addTask = task => {
+    if (user.role !== 'bureau') throw new Error('Seul le bureau du club peut gérer les tâches.')
     if (!supabaseConfigured) return localUpdate(d => ({ ...d, tasks: [...d.tasks, { ...task, id: crypto.randomUUID() }] }))
     return runRemote(async () => {
       let project = data.projects.find(item => item.club_id === task.clubId)
@@ -154,11 +158,13 @@ export function DataProvider({ children }) {
     })
   }
   const moveTask = (id, status) => {
+    if (user.role !== 'bureau') throw new Error('Seul le bureau du club peut gérer les tâches.')
     if (!supabaseConfigured) return localUpdate(d => ({ ...d, tasks: d.tasks.map(task => task.id === id ? { ...task, status } : task) }))
     const dbStatus = status === 'progress' ? 'doing' : status
     return runRemote(async () => { const { error } = await supabase.from('tasks').update({ status: dbStatus }).eq('id', id); if (error) throw error })
   }
   const updateTask = (id, updates) => {
+    if (user.role !== 'bureau') throw new Error('Seul le bureau du club peut gérer les tâches.')
     if (!supabaseConfigured) return localUpdate(d => ({ ...d, tasks: d.tasks.map(task => task.id === id ? { ...task, ...updates } : task) }))
     const assignedMember = data.members.find(member => member.name === updates.assignee)
     const payload = { title: updates.title, status: updates.status === 'progress' ? 'doing' : updates.status, priority: updates.priority, due_date: updates.dueDate, assignee: updates.assignee, assignee_id: assignedMember?.id }
@@ -181,14 +187,17 @@ export function DataProvider({ children }) {
   const setReservationStatus = (id, status) => supabaseConfigured
     ? runRemote(async () => { const { error } = await supabase.from('room_reservations').update({ status }).eq('id', id); if (error) throw error })
     : localUpdate(d => ({ ...d, reservations: d.reservations.map(item => item.id === id ? { ...item, status } : item) }))
-  const setEventStatus = (id, status) => supabaseConfigured
-    ? runRemote(async () => { const { error } = await supabase.from('events').update({ status }).eq('id', id); if (error) throw error })
-    : localUpdate(d => ({ ...d, events: d.events.map(event => event.id === id ? { ...event, status } : event) }))
+  const setEventStatus = (id, status) => {
+    if (user.role !== 'admin') throw new Error('Seule l’administration peut valider ou refuser un événement.')
+    return supabaseConfigured
+      ? runRemote(async () => { const { error } = await supabase.from('events').update({ status }).eq('id', id); if (error) throw error })
+      : localUpdate(d => ({ ...d, events: d.events.map(event => event.id === id ? { ...event, status } : event) }))
+  }
 
   const saveAllowedRole = assignment => {
     const email = assignment.email.trim().toLowerCase()
     if (!email.endsWith('@hestim.ma')) throw new Error('Utilisez une adresse institutionnelle @hestim.ma.')
-    if (!['bureau', 'member', 'admin'].includes(assignment.role)) throw new Error('Sélectionnez un rôle autorisé.')
+    if (!['bureau', 'admin'].includes(assignment.role)) throw new Error('Sélectionnez un rôle autorisé.')
     const clubId = assignment.role === 'admin' ? null : assignment.clubId
     if (assignment.role !== 'admin' && !data.clubs.some(club => club.id === clubId)) throw new Error('Choisissez un club existant.')
     const row = { email, role: assignment.role, bureau_role: assignment.bureauRole || (assignment.role === 'admin' ? 'Administration' : assignment.role === 'member' ? 'Membre actif' : 'Bureau du club'), club_id: clubId }
